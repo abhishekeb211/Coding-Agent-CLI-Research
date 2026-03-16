@@ -1,0 +1,24 @@
+database:
+  path: "./scan-results.db"
+
+scanners:
+  - bandit
+  - semgrep
+
+output:
+  format: "json"
+  path: "./scan-report.json"
+
+llm:
+  enabled: true
+  provider: "mock"
+  cache_enabled: true
+
+policies:
+  enabled: true
+  paths:
+    - "./policies"
+
+logging:
+  level: "info"
+  format: "json"

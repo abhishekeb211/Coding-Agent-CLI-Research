@@ -1,0 +1,24 @@
+policies:
+  - id: sql-injection-critical
+    name: "SQL Injection Prevention"
+    description: "Prevent SQL injection vulnerabilities"
+    cwe: ["89"]
+    severity: critical
+    action: deny
+    enabled: true
+
+  - id: command-injection
+    name: "OS Command Injection Prevention"
+    description: "Prevent OS command injection vulnerabilities"
+    cwe: ["78"]
+    severity: critical
+    action: deny
+    enabled: true
+
+  - id: code-injection
+    name: "Code Injection Prevention"
+    description: "Prevent code injection vulnerabilities"
+    cwe: ["94", "95"]
+    severity: critical
+    action: deny
+    enabled: true

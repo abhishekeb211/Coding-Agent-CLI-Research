@@ -1,0 +1,7 @@
+database:
+  path: "./scan-results.db"
+scanners:
+  - bandit
+  # Invalid YAML - improper indentation
+ output:
+   format: "json"

@@ -1,0 +1,8 @@
+name: "Invalid Policy"
+version: "1.0"
+policies:
+  - id: "test-policy"
+    name: "Test"
+    # Invalid YAML - missing closing quote
+    description: "This is invalid
+    action: "block"

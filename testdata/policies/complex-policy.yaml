@@ -1,0 +1,31 @@
+name: "Complex Security Policy"
+version: "2.0"
+description: "Advanced policy with multiple rules and conditions"
+
+policies:
+  - id: "critical-vulns"
+    name: "Block Critical Vulnerabilities"
+    description: "Block all critical severity findings"
+    severity: ["critical"]
+    action: "block"
+  
+  - id: "injection-attacks"
+    name: "Prevent Injection Attacks"
+    description: "Block common injection vulnerabilities"
+    cwe: ["89", "78", "79", "95"]
+    severity: ["high", "critical"]
+    action: "block"
+  
+  - id: "crypto-issues"
+    name: "Cryptography Issues"
+    description: "Warn on weak cryptography"
+    cwe: ["327", "328", "329"]
+    severity: ["medium", "high"]
+    action: "warn"
+  
+  - id: "info-disclosure"
+    name: "Information Disclosure"
+    description: "Monitor information disclosure"
+    cwe: ["200", "209", "215"]
+    severity: ["low", "medium"]
+    action: "allow"

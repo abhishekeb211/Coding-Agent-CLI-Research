@@ -1,0 +1,284 @@
+package storage
+
+import (
+	"os"
+	"testing"
+)
+
+// BenchmarkFindingInsertion benchmarks inserting findings into database
+func BenchmarkFindingInsertion(b *testing.B) {
+	db := setupBenchDB(b)
+	defer db.Close()
+
+	finding := Finding{
+		ID:          "test-finding",
+		RuleID:      "test-rule",
+		Severity:    "high",
+		CWE:         "CWE-89",
+		Description: "Test finding",
+		FilePath:    "test.py",
+		LineNumber:  42,
+		RunID:       "test-run",
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		finding.ID = "finding-" + string(rune(i))
+		err := db.InsertFinding(finding)
+		if err != nil {
+			b.Fatalf("Failed to insert finding: %v", err)
+		}
+	}
+}
+
+// BenchmarkFindingRetrievalByID benchmarks retrieving a finding by ID
+func BenchmarkFindingRetrievalByID(b *testing.B) {
+	db := setupBenchDB(b)
+	defer db.Close()
+
+	// Insert test findings
+	for i := 0; i < 1000; i++ {
+		finding := Finding{
+			ID:       "finding-" + string(rune(i)),
+			RuleID:   "rule-1",
+			Severity: "high",
+			RunID:    "run-1",
+		}
+		db.InsertFinding(finding)
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, err := db.GetFindingByID("finding-500")
+		if err != nil {
+			b.Fatalf("Failed to retrieve finding: %v", err)
+		}
+	}
+}
+
+// BenchmarkFindingQueryWithFilters benchmarks querying findings with filters
+func BenchmarkFindingQueryWithFilters(b *testing.B) {
+	db := setupBenchDB(b)
+	defer db.Close()
+
+	// Insert test findings
+	for i := 0; i < 10000; i++ {
+		finding := Finding{
+			ID:       "finding-" + string(rune(i)),
+			RuleID:   "rule-" + string(rune(i%10)),
+			Severity: []string{"low", "medium", "high", "critical"}[i%4],
+			CWE:      "CWE-" + string(rune(i%100)),
+			RunID:    "run-1",
+		}
+		db.InsertFinding(finding)
+	}
+
+	filters := FindingFilters{
+		Severity: "high",
+		CWE:      "CWE-89",
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, err := db.QueryFindings(filters)
+		if err != nil {
+			b.Fatalf("Failed to query findings: %v", err)
+		}
+	}
+}
+
+// BenchmarkDatabase1KFindings benchmarks database operations with 1K findings
+func BenchmarkDatabase1KFindings(b *testing.B) {
+	db := setupBenchDB(b)
+	defer db.Close()
+
+	findings := generateFindings(1000)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		for _, f := range findings {
+			db.InsertFinding(f)
+		}
+	}
+}
+
+// BenchmarkDatabase10KFindings benchmarks database operations with 10K findings
+func BenchmarkDatabase10KFindings(b *testing.B) {
+	db := setupBenchDB(b)
+	defer db.Close()
+
+	findings := generateFindings(10000)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		for _, f := range findings {
+			db.InsertFinding(f)
+		}
+	}
+}
+
+// BenchmarkDatabase50KFindings benchmarks database operations with 50K findings
+func BenchmarkDatabase50KFindings(b *testing.B) {
+	db := setupBenchDB(b)
+	defer db.Close()
+
+	findings := generateFindings(50000)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		for _, f := range findings {
+			db.InsertFinding(f)
+		}
+	}
+}
+
+// BenchmarkBulkInsert benchmarks bulk insertion of findings
+func BenchmarkBulkInsert(b *testing.B) {
+	db := setupBenchDB(b)
+	defer db.Close()
+
+	findings := generateFindings(1000)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		err := db.BulkInsertFindings(findings)
+		if err != nil {
+			b.Fatalf("Failed to bulk insert: %v", err)
+		}
+	}
+}
+
+// BenchmarkConcurrentReads benchmarks concurrent read operations
+func BenchmarkConcurrentReads(b *testing.B) {
+	db := setupBenchDB(b)
+	defer db.Close()
+
+	// Insert test data
+	for i := 0; i < 1000; i++ {
+		finding := Finding{
+			ID:       "finding-" + string(rune(i)),
+			RuleID:   "rule-1",
+			Severity: "high",
+			RunID:    "run-1",
+		}
+		db.InsertFinding(finding)
+	}
+
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			_, err := db.GetFindingByID("finding-500")
+			if err != nil {
+				b.Fatalf("Failed to retrieve finding: %v", err)
+			}
+		}
+	})
+}
+
+// BenchmarkConcurrentWrites benchmarks concurrent write operations
+func BenchmarkConcurrentWrites(b *testing.B) {
+	db := setupBenchDB(b)
+	defer db.Close()
+
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		i := 0
+		for pb.Next() {
+			finding := Finding{
+				ID:       "finding-" + string(rune(i)),
+				RuleID:   "rule-1",
+				Severity: "high",
+				RunID:    "run-1",
+			}
+			err := db.InsertFinding(finding)
+			if err != nil {
+				b.Fatalf("Failed to insert finding: %v", err)
+			}
+			i++
+		}
+	})
+}
+
+// BenchmarkIndexedQuery benchmarks queries using indexed columns
+func BenchmarkIndexedQuery(b *testing.B) {
+	db := setupBenchDB(b)
+	defer db.Close()
+
+	// Insert test data
+	for i := 0; i < 10000; i++ {
+		finding := Finding{
+			ID:       "finding-" + string(rune(i)),
+			RuleID:   "rule-" + string(rune(i%100)),
+			Severity: "high",
+			RunID:    "run-1",
+		}
+		db.InsertFinding(finding)
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, err := db.GetFindingsByRunID("run-1")
+		if err != nil {
+			b.Fatalf("Failed to query by run ID: %v", err)
+		}
+	}
+}
+
+// BenchmarkMemoryUsage measures memory usage during database operations
+func BenchmarkMemoryUsage(b *testing.B) {
+	db := setupBenchDB(b)
+	defer db.Close()
+
+	findings := generateFindings(10000)
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		for _, f := range findings {
+			db.InsertFinding(f)
+		}
+	}
+}
+
+// Helper functions
+
+func setupBenchDB(b *testing.B) *Database {
+	b.Helper()
+
+	tempFile, err := os.CreateTemp("", "bench-db-*.db")
+	if err != nil {
+		b.Fatalf("Failed to create temp db: %v", err)
+	}
+	tempFile.Close()
+
+	db, err := NewDatabase(tempFile.Name())
+	if err != nil {
+		b.Fatalf("Failed to create database: %v", err)
+	}
+
+	return db
+}
+
+func generateFindings(count int) []Finding {
+	findings := make([]Finding, count)
+	for i := 0; i < count; i++ {
+		findings[i] = Finding{
+			ID:          "finding-" + string(rune(i)),
+			RuleID:      "rule-" + string(rune(i%10)),
+			Severity:    []string{"low", "medium", "high", "critical"}[i%4],
+			CWE:         "CWE-" + string(rune(i%100)),
+			Description: "Test finding " + string(rune(i)),
+			FilePath:    "file" + string(rune(i%50)) + ".py",
+			LineNumber:  i % 1000,
+			RunID:       "run-1",
+		}
+	}
+	return findings
+}
+
+// FindingFilters represents query filters
+type FindingFilters struct {
+	Severity string
+	CWE      string
+	RunID    string
+}

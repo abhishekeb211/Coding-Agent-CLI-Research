@@ -1,0 +1,46 @@
+{
+  "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Coding Agent CLI",
+          "version": "1.0.0",
+          "rules": [
+            {
+              "id": "CWE-89",
+              "name": "SQL Injection",
+              "shortDescription": {
+                "text": "Improper Neutralization of Special Elements used in an SQL Command"
+              },
+              "helpUri": "https://cwe.mitre.org/data/definitions/89.html"
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "CWE-89",
+          "level": "error",
+          "message": {
+            "text": "Possible SQL injection vector through string-based query construction."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "testdata/vulnerable-code/sql-injection.py"
+                },
+                "region": {
+                  "startLine": 9,
+                  "startColumn": 4
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

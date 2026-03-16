@@ -1,0 +1,265 @@
+package scanner
+
+import (
+	"os"
+	"path/filepath"
+	"testing"
+)
+
+// BenchmarkScan1KLOC benchmarks scanning a 1K LOC codebase
+func BenchmarkScan1KLOC(b *testing.B) {
+	tempDir := setupBenchmarkCodebase(b, 1000)
+	defer os.RemoveAll(tempDir)
+
+	config := &Config{
+		Scanners: []string{"bandit"},
+		Path:     tempDir,
+		Output:   "json",
+	}
+
+	db := setupBenchmarkDB(b)
+	defer db.Close()
+
+	orch, err := NewOrchestrator(config, db)
+	if err != nil {
+		b.Fatalf("Failed to create orchestrator: %v", err)
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, err := orch.Scan()
+		if err != nil {
+			b.Fatalf("Scan failed: %v", err)
+		}
+	}
+}
+
+// BenchmarkScan10KLOC benchmarks scanning a 10K LOC codebase
+func BenchmarkScan10KLOC(b *testing.B) {
+	tempDir := setupBenchmarkCodebase(b, 10000)
+	defer os.RemoveAll(tempDir)
+
+	config := &Config{
+		Scanners: []string{"bandit"},
+		Path:     tempDir,
+		Output:   "json",
+	}
+
+	db := setupBenchmarkDB(b)
+	defer db.Close()
+
+	orch, err := NewOrchestrator(config, db)
+	if err != nil {
+		b.Fatalf("Failed to create orchestrator: %v", err)
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, err := orch.Scan()
+		if err != nil {
+			b.Fatalf("Scan failed: %v", err)
+		}
+	}
+}
+
+// BenchmarkScan50KLOC benchmarks scanning a 50K LOC codebase
+func BenchmarkScan50KLOC(b *testing.B) {
+	tempDir := setupBenchmarkCodebase(b, 50000)
+	defer os.RemoveAll(tempDir)
+
+	config := &Config{
+		Scanners: []string{"bandit"},
+		Path:     tempDir,
+		Output:   "json",
+	}
+
+	db := setupBenchmarkDB(b)
+	defer db.Close()
+
+	orch, err := NewOrchestrator(config, db)
+	if err != nil {
+		b.Fatalf("Failed to create orchestrator: %v", err)
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, err := orch.Scan()
+		if err != nil {
+			b.Fatalf("Scan failed: %v", err)
+		}
+	}
+}
+
+// BenchmarkMultiScannerExecution benchmarks parallel scanner execution
+func BenchmarkMultiScannerExecution(b *testing.B) {
+	tempDir := setupBenchmarkCodebase(b, 5000)
+	defer os.RemoveAll(tempDir)
+
+	config := &Config{
+		Scanners: []string{"bandit", "semgrep"},
+		Path:     tempDir,
+		Output:   "json",
+	}
+
+	db := setupBenchmarkDB(b)
+	defer db.Close()
+
+	orch, err := NewOrchestrator(config, db)
+	if err != nil {
+		b.Fatalf("Failed to create orchestrator: %v", err)
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, err := orch.Scan()
+		if err != nil {
+			b.Fatalf("Scan failed: %v", err)
+		}
+	}
+}
+
+// BenchmarkFindingAggregation benchmarks finding aggregation from multiple scanners
+func BenchmarkFindingAggregation(b *testing.B) {
+	findings1 := generateBenchmarkFindings(1000)
+	findings2 := generateBenchmarkFindings(1000)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = aggregateFindings(findings1, findings2)
+	}
+}
+
+// BenchmarkFindingDeduplication benchmarks finding deduplication logic
+func BenchmarkFindingDeduplication(b *testing.B) {
+	findings := generateBenchmarkFindings(5000)
+	// Add duplicates
+	findings = append(findings, findings[:1000]...)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = deduplicateFindings(findings)
+	}
+}
+
+// BenchmarkMemoryAllocation measures memory allocations during scan
+func BenchmarkMemoryAllocation(b *testing.B) {
+	tempDir := setupBenchmarkCodebase(b, 10000)
+	defer os.RemoveAll(tempDir)
+
+	config := &Config{
+		Scanners: []string{"bandit"},
+		Path:     tempDir,
+		Output:   "json",
+	}
+
+	db := setupBenchmarkDB(b)
+	defer db.Close()
+
+	orch, err := NewOrchestrator(config, db)
+	if err != nil {
+		b.Fatalf("Failed to create orchestrator: %v", err)
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, err := orch.Scan()
+		if err != nil {
+			b.Fatalf("Scan failed: %v", err)
+		}
+	}
+}
+
+// Helper functions
+
+func setupBenchmarkCodebase(b *testing.B, loc int) string {
+	b.Helper()
+
+	tempDir, err := os.MkdirTemp("", "bench-*")
+	if err != nil {
+		b.Fatalf("Failed to create temp dir: %v", err)
+	}
+
+	// Generate Python files with approximately 'loc' lines of code
+	filesCount := loc / 100 // ~100 lines per file
+	if filesCount < 1 {
+		filesCount = 1
+	}
+
+	for i := 0; i < filesCount; i++ {
+		content := generatePythonCode(100)
+		filePath := filepath.Join(tempDir, "file_"+string(rune(i))+".py")
+		if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
+			b.Fatalf("Failed to write file: %v", err)
+		}
+	}
+
+	return tempDir
+}
+
+func generatePythonCode(lines int) string {
+	code := "import os\nimport sys\n\n"
+	for i := 0; i < lines-2; i++ {
+		if i%10 == 0 {
+			code += "def function_" + string(rune(i/10)) + "():\n"
+		} else {
+			code += "    x = " + string(rune(i)) + "\n"
+		}
+	}
+	return code
+}
+
+func setupBenchmarkDB(b *testing.B) *Database {
+	b.Helper()
+
+	tempFile, err := os.CreateTemp("", "bench-db-*.db")
+	if err != nil {
+		b.Fatalf("Failed to create temp db: %v", err)
+	}
+	tempFile.Close()
+
+	db, err := NewDatabase(tempFile.Name())
+	if err != nil {
+		b.Fatalf("Failed to create database: %v", err)
+	}
+
+	return db
+}
+
+func generateBenchmarkFindings(count int) []Finding {
+	findings := make([]Finding, count)
+	for i := 0; i < count; i++ {
+		findings[i] = Finding{
+			ID:          "finding-" + string(rune(i)),
+			RuleID:      "rule-" + string(rune(i%10)),
+			Severity:    "high",
+			CWE:         "CWE-89",
+			Description: "Test finding",
+			FilePath:    "test.py",
+			LineNumber:  i,
+		}
+	}
+	return findings
+}
+
+func aggregateFindings(findings1, findings2 []Finding) []Finding {
+	result := make([]Finding, 0, len(findings1)+len(findings2))
+	result = append(result, findings1...)
+	result = append(result, findings2...)
+	return result
+}
+
+func deduplicateFindings(findings []Finding) []Finding {
+	seen := make(map[string]bool)
+	result := make([]Finding, 0, len(findings))
+
+	for _, f := range findings {
+		key := f.FilePath + ":" + string(rune(f.LineNumber)) + ":" + f.RuleID
+		if !seen[key] {
+			seen[key] = true
+			result = append(result, f)
+		}
+	}
+
+	return result
+}

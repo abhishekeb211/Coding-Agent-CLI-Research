@@ -1,0 +1,296 @@
+package llm
+
+import (
+	"os"
+	"testing"
+)
+
+// BenchmarkCacheLookup benchmarks cache lookup performance
+func BenchmarkCacheLookup(b *testing.B) {
+	cache := setupBenchCache(b)
+	defer cache.Close()
+
+	// Populate cache
+	for i := 0; i < 1000; i++ {
+		key := "key-" + string(rune(i))
+		value := "remediation for finding " + string(rune(i))
+		cache.Set(key, value)
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = cache.Get("key-500")
+	}
+}
+
+// BenchmarkCacheStorage benchmarks cache storage performance
+func BenchmarkCacheStorage(b *testing.B) {
+	cache := setupBenchCache(b)
+	defer cache.Close()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		key := "key-" + string(rune(i))
+		value := "remediation for finding " + string(rune(i))
+		err := cache.Set(key, value)
+		if err != nil {
+			b.Fatalf("Failed to set cache: %v", err)
+		}
+	}
+}
+
+// BenchmarkCacheHitRate measures cache hit rate with repeated findings
+func BenchmarkCacheHitRate(b *testing.B) {
+	cache := setupBenchCache(b)
+	defer cache.Close()
+
+	// Populate cache with 100 entries
+	for i := 0; i < 100; i++ {
+		key := "key-" + string(rune(i))
+		value := "remediation " + string(rune(i))
+		cache.Set(key, value)
+	}
+
+	hits := 0
+	misses := 0
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		// 70% of requests hit cache (keys 0-69)
+		// 30% of requests miss cache (keys 100-129)
+		var key string
+		if i%10 < 7 {
+			key = "key-" + string(rune(i%70))
+		} else {
+			key = "key-" + string(rune(100+i%30))
+		}
+
+		_, found := cache.Get(key)
+		if found {
+			hits++
+		} else {
+			misses++
+		}
+	}
+
+	hitRate := float64(hits) / float64(hits+misses) * 100
+	b.ReportMetric(hitRate, "hit_rate_%")
+}
+
+// BenchmarkCacheMemoryUsage measures cache memory usage
+func BenchmarkCacheMemoryUsage(b *testing.B) {
+	cache := setupBenchCache(b)
+	defer cache.Close()
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		key := "key-" + string(rune(i))
+		value := generateLargeRemediation(500) // 500 words
+		cache.Set(key, value)
+	}
+}
+
+// BenchmarkCacheWithSmallEntries benchmarks cache with small entries
+func BenchmarkCacheWithSmallEntries(b *testing.B) {
+	cache := setupBenchCache(b)
+	defer cache.Close()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		key := "key-" + string(rune(i))
+		value := "Small remediation text"
+		cache.Set(key, value)
+	}
+}
+
+// BenchmarkCacheWithLargeEntries benchmarks cache with large entries
+func BenchmarkCacheWithLargeEntries(b *testing.B) {
+	cache := setupBenchCache(b)
+	defer cache.Close()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		key := "key-" + string(rune(i))
+		value := generateLargeRemediation(1000) // 1000 words
+		cache.Set(key, value)
+	}
+}
+
+// BenchmarkCacheConcurrentReads benchmarks concurrent cache reads
+func BenchmarkCacheConcurrentReads(b *testing.B) {
+	cache := setupBenchCache(b)
+	defer cache.Close()
+
+	// Populate cache
+	for i := 0; i < 1000; i++ {
+		key := "key-" + string(rune(i))
+		value := "remediation " + string(rune(i))
+		cache.Set(key, value)
+	}
+
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			_, _ = cache.Get("key-500")
+		}
+	})
+}
+
+// BenchmarkCacheConcurrentWrites benchmarks concurrent cache writes
+func BenchmarkCacheConcurrentWrites(b *testing.B) {
+	cache := setupBenchCache(b)
+	defer cache.Close()
+
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		i := 0
+		for pb.Next() {
+			key := "key-" + string(rune(i))
+			value := "remediation " + string(rune(i))
+			cache.Set(key, value)
+			i++
+		}
+	})
+}
+
+// BenchmarkCacheEviction benchmarks cache eviction performance
+func BenchmarkCacheEviction(b *testing.B) {
+	cache := setupBenchCache(b)
+	defer cache.Close()
+
+	// Set cache size limit
+	cache.SetMaxSize(1000)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		key := "key-" + string(rune(i))
+		value := "remediation " + string(rune(i))
+		cache.Set(key, value)
+
+		// Trigger eviction when cache is full
+		if i%1000 == 0 {
+			cache.Evict()
+		}
+	}
+}
+
+// BenchmarkCachePersistence benchmarks cache persistence to disk
+func BenchmarkCachePersistence(b *testing.B) {
+	tempFile, err := os.CreateTemp("", "bench-cache-*.db")
+	if err != nil {
+		b.Fatalf("Failed to create temp file: %v", err)
+	}
+	tempFile.Close()
+	defer os.Remove(tempFile.Name())
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		cache, err := NewCache(tempFile.Name())
+		if err != nil {
+			b.Fatalf("Failed to create cache: %v", err)
+		}
+
+		// Write some data
+		for j := 0; j < 100; j++ {
+			key := "key-" + string(rune(j))
+			value := "value " + string(rune(j))
+			cache.Set(key, value)
+		}
+
+		cache.Close()
+	}
+}
+
+// BenchmarkCacheKeyGeneration benchmarks cache key generation
+func BenchmarkCacheKeyGeneration(b *testing.B) {
+	finding := Finding{
+		RuleID:      "sql-injection",
+		CWE:         "CWE-89",
+		Description: "SQL injection vulnerability",
+		CodeSnippet: "SELECT * FROM users WHERE id = " + user_id,
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = generateCacheKey(finding)
+	}
+}
+
+// BenchmarkCacheWithRealWorldPattern simulates real-world cache usage
+func BenchmarkCacheWithRealWorldPattern(b *testing.B) {
+	cache := setupBenchCache(b)
+	defer cache.Close()
+
+	// Simulate real-world pattern:
+	// - 60% cache hits (common vulnerabilities)
+	// - 30% cache misses (new vulnerabilities)
+	// - 10% cache updates (remediation improvements)
+
+	commonKeys := make([]string, 60)
+	for i := 0; i < 60; i++ {
+		key := "common-" + string(rune(i))
+		commonKeys[i] = key
+		cache.Set(key, "Common remediation "+string(rune(i)))
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		operation := i % 10
+
+		if operation < 6 {
+			// Cache hit
+			_, _ = cache.Get(commonKeys[i%60])
+		} else if operation < 9 {
+			// Cache miss
+			key := "new-" + string(rune(i))
+			_, found := cache.Get(key)
+			if !found {
+				cache.Set(key, "New remediation")
+			}
+		} else {
+			// Cache update
+			key := commonKeys[i%60]
+			cache.Set(key, "Updated remediation")
+		}
+	}
+}
+
+// Helper functions
+
+func setupBenchCache(b *testing.B) *Cache {
+	b.Helper()
+
+	tempFile, err := os.CreateTemp("", "bench-cache-*.db")
+	if err != nil {
+		b.Fatalf("Failed to create temp file: %v", err)
+	}
+	tempFile.Close()
+
+	cache, err := NewCache(tempFile.Name())
+	if err != nil {
+		b.Fatalf("Failed to create cache: %v", err)
+	}
+
+	return cache
+}
+
+func generateLargeRemediation(words int) string {
+	text := ""
+	for i := 0; i < words; i++ {
+		text += "word" + string(rune(i)) + " "
+	}
+	return text
+}
+
+func generateCacheKey(finding Finding) string {
+	return finding.RuleID + ":" + finding.CWE + ":" + finding.Description
+}
+
+// Finding represents a security finding (simplified for benchmarking)
+type Finding struct {
+	RuleID      string
+	CWE         string
+	Description string
+	CodeSnippet string
+}

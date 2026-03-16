@@ -1,0 +1,80 @@
+policies:
+  - id: owasp-a01-broken-access-control
+    name: "OWASP A01: Broken Access Control"
+    description: "Prevent broken access control vulnerabilities"
+    cwe: ["284", "285", "862", "863"]
+    severity: high
+    action: deny
+    enabled: true
+
+  - id: owasp-a02-cryptographic-failures
+    name: "OWASP A02: Cryptographic Failures"
+    description: "Prevent cryptographic failures"
+    cwe: ["327", "326", "328", "330"]
+    severity: high
+    action: deny
+    enabled: true
+
+  - id: owasp-a03-injection
+    name: "OWASP A03: Injection"
+    description: "Prevent injection vulnerabilities"
+    cwe: ["89", "78", "79", "94"]
+    severity: critical
+    action: deny
+    enabled: true
+
+  - id: owasp-a04-insecure-design
+    name: "OWASP A04: Insecure Design"
+    description: "Identify insecure design patterns"
+    cwe: ["209", "256", "501"]
+    severity: medium
+    action: warn
+    enabled: true
+
+  - id: owasp-a05-security-misconfiguration
+    name: "OWASP A05: Security Misconfiguration"
+    description: "Prevent security misconfigurations"
+    cwe: ["16", "611", "776"]
+    severity: medium
+    action: warn
+    enabled: true
+
+  - id: owasp-a06-vulnerable-components
+    name: "OWASP A06: Vulnerable and Outdated Components"
+    description: "Identify use of vulnerable components"
+    cwe: ["1104"]
+    severity: high
+    action: warn
+    enabled: true
+
+  - id: owasp-a07-identification-failures
+    name: "OWASP A07: Identification and Authentication Failures"
+    description: "Prevent authentication failures"
+    cwe: ["287", "798", "640"]
+    severity: high
+    action: deny
+    enabled: true
+
+  - id: owasp-a08-data-integrity-failures
+    name: "OWASP A08: Software and Data Integrity Failures"
+    description: "Prevent data integrity failures"
+    cwe: ["502", "829"]
+    severity: high
+    action: deny
+    enabled: true
+
+  - id: owasp-a09-logging-failures
+    name: "OWASP A09: Security Logging and Monitoring Failures"
+    description: "Ensure proper logging and monitoring"
+    cwe: ["778", "117"]
+    severity: low
+    action: warn
+    enabled: true
+
+  - id: owasp-a10-ssrf
+    name: "OWASP A10: Server-Side Request Forgery"
+    description: "Prevent SSRF vulnerabilities"
+    cwe: ["918"]
+    severity: high
+    action: deny
+    enabled: true

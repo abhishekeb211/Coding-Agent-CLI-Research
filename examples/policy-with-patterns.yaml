@@ -1,0 +1,117 @@
+# Example policy file demonstrating file path pattern matching
+# This feature allows you to apply different policies to different parts of your codebase
+
+policies:
+  # Policy 1: Strict security for production code
+  - id: "strict-sql-injection-prod"
+    name: "SQL Injection - Production Code"
+    description: "Deny SQL injection vulnerabilities in production code"
+    cwe:
+      - "CWE-89"
+    severity: "high"
+    action: "deny"
+    enabled: true
+    patterns:
+      include:
+        - "**/*.go"
+        - "**/*.py"
+      exclude:
+        - "**/*_test.go"
+        - "**/test_*.py"
+        - "vendor/**"
+        - "testdata/**"
+
+  # Policy 2: Relaxed policy for test files
+  - id: "relaxed-sql-injection-tests"
+    name: "SQL Injection - Test Files"
+    description: "Warn on SQL injection in test files (less strict)"
+    cwe:
+      - "CWE-89"
+    severity: "high"
+    action: "warn"
+    enabled: true
+    patterns:
+      include:
+        - "**/*_test.go"
+        - "**/test_*.py"
+
+  # Policy 3: XSS only in web-related files
+  - id: "xss-web-files"
+    name: "XSS in Web Files"
+    description: "Check for XSS vulnerabilities in web-related files"
+    cwe:
+      - "CWE-79"
+    severity: "high"
+    action: "deny"
+    enabled: true
+    patterns:
+      include:
+        - "web/**/*.go"
+        - "api/**/*.go"
+        - "internal/api/**/*.go"
+
+  # Policy 4: Exclude vendor directory from all checks
+  - id: "vendor-exclusion"
+    name: "Vendor Directory Exclusion"
+    description: "Allow all findings in vendor directory"
+    cwe:
+      - "*"
+    severity: ""
+    action: "allow"
+    enabled: true
+    patterns:
+      include:
+        - "vendor/**"
+
+  # Policy 5: Critical findings in specific directories
+  - id: "critical-auth-files"
+    name: "Critical Findings in Auth"
+    description: "Deny all critical findings in authentication code"
+    cwe:
+      - "*"
+    severity: "critical"
+    action: "deny"
+    enabled: true
+    patterns:
+      include:
+        - "**/auth/**"
+        - "**/authentication/**"
+        - "**/security/**"
+
+  # Policy 6: JavaScript/TypeScript specific patterns
+  - id: "js-security"
+    name: "JavaScript Security"
+    description: "Security checks for JavaScript/TypeScript files"
+    cwe:
+      - "CWE-79"  # XSS
+      - "CWE-89"  # SQL Injection
+      - "CWE-94"  # Code Injection
+    severity: "high"
+    action: "deny"
+    enabled: true
+    patterns:
+      include:
+        - "**/*.js"
+        - "**/*.ts"
+        - "**/*.jsx"
+        - "**/*.tsx"
+      exclude:
+        - "node_modules/**"
+        - "dist/**"
+        - "build/**"
+
+# Pattern Syntax Examples:
+# - "*.go"           - All .go files in root directory
+# - "**/*.go"        - All .go files in any directory
+# - "src/**/*.go"    - All .go files under src/ directory
+# - "**/*_test.go"   - All test files in any directory
+# - "vendor/**"      - All files in vendor directory
+# - "src/**/test_*"  - All files starting with test_ under src/
+
+# Pattern Matching Rules:
+# 1. If no patterns are specified, the policy matches all files
+# 2. If include patterns are specified, the file must match at least one
+# 3. If exclude patterns are specified, the file must not match any
+# 4. Exclude patterns take precedence over include patterns
+# 5. Patterns use forward slashes (/) even on Windows
+# 6. Patterns are case-sensitive

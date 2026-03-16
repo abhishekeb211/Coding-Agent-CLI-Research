@@ -1,0 +1,18 @@
+name: "Test Security Policy"
+version: "1.0"
+description: "Sample policy for testing"
+
+policies:
+  - id: "test-sql-injection"
+    name: "Prevent SQL Injection"
+    description: "Block SQL injection vulnerabilities"
+    severity: ["high", "critical"]
+    cwe: ["89"]
+    action: "block"
+  
+  - id: "test-hardcoded-secrets"
+    name: "No Hardcoded Secrets"
+    description: "Warn on hardcoded credentials"
+    severity: ["medium", "high", "critical"]
+    cwe: ["798", "259", "321"]
+    action: "warn"

@@ -1,0 +1,63 @@
+{
+  "errors": [],
+  "generated_at": "2026-03-02T10:00:00Z",
+  "metrics": {
+    "_totals": {
+      "CONFIDENCE.HIGH": 2,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 1,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 2,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 1,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 50,
+      "nosec": 0,
+      "skipped_tests": 0
+    }
+  },
+  "results": [
+    {
+      "code": "query = \"SELECT * FROM users WHERE username = '\" + username + \"'\"",
+      "col_offset": 4,
+      "end_col_offset": 68,
+      "filename": "testdata/vulnerable-code/sql-injection.py",
+      "issue_confidence": "HIGH",
+      "issue_severity": "HIGH",
+      "issue_text": "Possible SQL injection vector through string-based query construction.",
+      "line_number": 9,
+      "line_range": [9],
+      "more_info": "https://bandit.readthedocs.io/en/latest/plugins/b608_hardcoded_sql_expressions.html",
+      "test_id": "B608",
+      "test_name": "hardcoded_sql_expressions"
+    },
+    {
+      "code": "API_KEY = \"AKIAIOSFODNN7EXAMPLE\"",
+      "col_offset": 0,
+      "end_col_offset": 37,
+      "filename": "testdata/vulnerable-code/hardcoded-secrets.py",
+      "issue_confidence": "HIGH",
+      "issue_severity": "HIGH",
+      "issue_text": "Possible hardcoded password: 'AKIAIOSFODNN7EXAMPLE'",
+      "line_number": 4,
+      "line_range": [4],
+      "more_info": "https://bandit.readthedocs.io/en/latest/plugins/b105_hardcoded_password_string.html",
+      "test_id": "B105",
+      "test_name": "hardcoded_password_string"
+    },
+    {
+      "code": "os.system(\"ping -c 1 \" + hostname)",
+      "col_offset": 4,
+      "end_col_offset": 42,
+      "filename": "testdata/vulnerable-code/command-injection.py",
+      "issue_confidence": "MEDIUM",
+      "issue_severity": "MEDIUM",
+      "issue_text": "Consider possible security implications associated with the subprocess module.",
+      "line_number": 7,
+      "line_range": [7],
+      "more_info": "https://bandit.readthedocs.io/en/latest/plugins/b605_start_process_with_a_shell.html",
+      "test_id": "B605",
+      "test_name": "start_process_with_a_shell"
+    }
+  ]
+}

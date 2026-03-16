@@ -1,0 +1,9 @@
+{
+  "errors": [],
+  "results": [
+    {
+      "invalid": "missing required fields",
+      "no_filename": true
+    }
+  ]
+  // Missing closing brace - malformed JSON

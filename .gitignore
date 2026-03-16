@@ -1,0 +1,60 @@
+# Binaries
+coding-agent-cli
+coding-agent-cli.exe
+*.exe
+dist/
+
+# Test coverage
+coverage.out
+coverage.html
+*.coverprofile
+
+# Test results
+test-results.txt
+coverage-results*.txt
+
+# Build artifacts
+*.o
+*.a
+*.so
+*.dylib
+
+# Go workspace
+vendor/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Database files
+*.db
+*.db-shm
+*.db-wal
+data/
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.bak
+*.old
+
+# Batch/shell scripts (temporary)
+cleanup-*.bat
+fix-*.bat
+test.bat
+test.sh
+
+# Status reports (temporary)
+*_STATUS*.md
+*_FIX*.md
+AUTOMATED_*.md
+CURRENT_*.md

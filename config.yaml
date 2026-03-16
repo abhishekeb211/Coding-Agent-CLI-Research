@@ -1,0 +1,59 @@
+# Coding Agent CLI Configuration
+
+# Scanners to use
+scanners:
+  - bandit
+  - semgrep
+
+# Offline mode (cryptographic verification of no network calls)
+offline_mode: true
+
+# Database configuration
+database:
+  path: ./data/findings.db
+  auto_migrate: true
+
+# LLM configuration
+llm:
+  enabled: true
+  model: llama-3-8b-instruct-q4
+  model_path: ./models/llama-3-8b-instruct-q4.gguf
+  max_tokens: 1024
+  temperature: 0.3
+  timeout: 30s
+
+# Policy configuration
+policies:
+  enabled: true
+  paths:
+    - ./policies/hipaa.yaml
+    - ./policies/owasp-top10.yaml
+
+# Waiver configuration
+waivers:
+  enabled: true
+  path: ./waivers/waivers.yaml
+
+# Compliance reporting
+compliance:
+  enabled: true
+  report_format: markdown
+  report_path: ./reports/compliance-report.md
+
+# Privacy controls
+privacy:
+  redact_secrets: true
+  redact_patterns:
+    - 'AKIA[0-9A-Z]{16}'  # AWS keys
+    - '[a-zA-Z0-9_-]{32,}'  # API tokens
+    - '\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'  # Emails
+
+# Logging
+logging:
+  level: info  # debug, info, warn, error
+  format: console  # console, json
+
+# Output
+output:
+  default_format: json  # json, sarif, markdown
+  pretty_print: true

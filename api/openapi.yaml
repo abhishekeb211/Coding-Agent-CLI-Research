@@ -1,0 +1,997 @@
+openapi: 3.0.3
+info:
+  title: Coding Agent CLI REST API
+  description: |
+    REST API for the Coding Agent CLI security scanning platform.
+    
+    This API provides programmatic access to security scanning, findings management,
+    policy validation, analytics, and webhook configuration.
+    
+    ## Features
+    - Trigger and manage security scans
+    - Query and filter security findings
+    - Validate security policies
+    - Access analytics and trends
+    - Configure webhook notifications
+    - Import findings from external tools
+    
+    ## Base URL
+    The default base URL is `http://localhost:8080/api/v1`
+    
+    ## Rate Limiting
+    - Unauthenticated: 100 requests/minute
+    - Authenticated: 1000 requests/minute
+    
+    Rate limit headers are included in all responses:
+    - `X-RateLimit-Limit`: Maximum requests per window
+    - `X-RateLimit-Remaining`: Remaining requests in current window
+    - `X-RateLimit-Reset`: Unix timestamp when the rate limit resets
+  version: 1.2.0
+  contact:
+    name: Coding Agent CLI
+    url: https://github.com/coding-agent/cli
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Local development server
+  - url: http://localhost:{port}/api/v1
+    description: Custom port server
+    variables:
+      port:
+        default: '8080'
+        description: Server port
+
+tags:
+  - name: Health
+    description: Health check and status endpoints
+  - name: Scans
+    description: Security scan management
+  - name: Findings
+    description: Security findings and vulnerabilities
+  - name: Policies
+    description: Security policy validation
+  - name: Reports
+    description: Report generation
+  - name: Analytics
+    description: Analytics and trending data
+
+paths:
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Health check
+      description: Check if the API server is running and healthy
+      operationId: getHealth
+      responses:
+        '200':
+          description: Server is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              example:
+                status: ok
+                version: 1.2.0
+
+  /scans:
+    post:
+      tags:
+        - Scans
+      summary: Create a new scan
+      description: |
+        Trigger a new security scan on the specified path.
+        The scan runs asynchronously and returns immediately with a scan ID.
+      operationId: createScan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScanRequest'
+            examples:
+              basic:
+                summary: Basic scan
+                value:
+                  path: /path/to/code
+              with_scanners:
+                summary: Scan with specific scanners
+                value:
+                  path: /path/to/code
+                  scanners:
+                    - bandit
+                    - semgrep
+                    - gosec
+              with_policies:
+                summary: Scan with policies
+                value:
+                  path: /path/to/code
+                  scanners:
+                    - bandit
+                    - semgrep
+                  policies:
+                    - ./policies/security.yaml
+                    - ./policies/compliance.yaml
+      responses:
+        '202':
+          description: Scan accepted and started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScanResponse'
+              example:
+                scan_id: abc123def456
+                status: running
+                started: '2026-03-03T10:00:00Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    get:
+      tags:
+        - Scans
+      summary: List scans
+      description: |
+        Retrieve a paginated list of all security scans.
+        Results are ordered by start time (most recent first).
+      operationId: listScans
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: List of scans
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScanListResponse'
+              example:
+                scans:
+                  - scan_id: abc123
+                    target_path: /path/to/code
+                    status: completed
+                    start_time: '2026-03-03T10:00:00Z'
+                    end_time: '2026-03-03T10:05:00Z'
+                    duration: 300
+                    total_findings: 42
+                  - scan_id: def456
+                    target_path: /another/path
+                    status: running
+                    start_time: '2026-03-03T11:00:00Z'
+                    duration: 0
+                    total_findings: 0
+                total: 150
+                page: 1
+                page_size: 50
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /scans/{id}:
+    get:
+      tags:
+        - Scans
+      summary: Get scan details
+      description: |
+        Retrieve detailed information about a specific scan,
+        including all findings discovered during the scan.
+      operationId: getScan
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Scan ID
+          schema:
+            type: string
+          example: abc123def456
+      responses:
+        '200':
+          description: Scan details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScanDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /findings:
+    get:
+      tags:
+        - Findings
+      summary: List findings
+      description: |
+        Retrieve a paginated list of security findings with optional filtering.
+        Results are ordered by severity (critical first) and then by file path.
+      operationId: listFindings
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: severity
+          in: query
+          description: Filter by severity level
+          schema:
+            type: string
+            enum: [critical, high, medium, low]
+          example: critical
+        - name: cwe_id
+          in: query
+          description: Filter by CWE ID
+          schema:
+            type: string
+          example: CWE-89
+        - name: run_id
+          in: query
+          description: Filter by scan run ID
+          schema:
+            type: string
+          example: abc123def456
+        - name: file_path
+          in: query
+          description: Filter by file path (partial match)
+          schema:
+            type: string
+          example: auth.py
+      responses:
+        '200':
+          description: List of findings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FindingsResponse'
+              example:
+                findings:
+                  - id: finding-001
+                    finding_id: bandit-B201
+                    cwe_id: CWE-89
+                    cwe_description: SQL Injection
+                    severity: critical
+                    confidence: high
+                    code_fingerprint: abc123
+                    file_path: app/auth.py
+                    line_number: 42
+                    description: Possible SQL injection vulnerability
+                total: 150
+                page: 1
+                page_size: 50
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /findings/{id}:
+    get:
+      tags:
+        - Findings
+      summary: Get finding details
+      description: Retrieve detailed information about a specific security finding
+      operationId: getFinding
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Finding ID (normalized ID)
+          schema:
+            type: string
+          example: finding-001
+      responses:
+        '200':
+          description: Finding details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NormalizedFinding'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /findings/import:
+    post:
+      tags:
+        - Findings
+      summary: Import findings
+      description: |
+        Import security findings from external tools in SARIF or JSON format.
+        Supports merge, replace, and skip modes for handling existing findings.
+      operationId: importFindings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ImportRequest'
+            examples:
+              sarif:
+                summary: Import SARIF file
+                value:
+                  format: sarif
+                  mode: merge
+                  data: <base64-encoded-sarif-content>
+              json:
+                summary: Import JSON findings
+                value:
+                  format: json
+                  mode: replace
+                  run_id: custom-scan-001
+                  target_path: /path/to/code
+                  tool_name: custom-scanner
+                  data: <base64-encoded-json-content>
+      responses:
+        '200':
+          description: Import completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '501':
+          description: Import not yet fully implemented
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+
+  /policies/validate:
+    post:
+      tags:
+        - Policies
+      summary: Validate policy
+      description: |
+        Validate a security policy YAML configuration.
+        Checks syntax, structure, and rule definitions.
+      operationId: validatePolicy
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PolicyValidateRequest'
+            example:
+              policy_yaml: |
+                version: 1
+                rules:
+                  - name: Block critical findings
+                    severity: critical
+                    action: fail
+      responses:
+        '200':
+          description: Policy validation result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PolicyValidateResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '501':
+          description: Policy validation not yet implemented
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+
+  /reports/{id}:
+    get:
+      tags:
+        - Reports
+      summary: Generate report
+      description: |
+        Generate a report for a specific scan.
+        Supports multiple output formats.
+      operationId: generateReport
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Scan ID or report ID
+          schema:
+            type: string
+          example: abc123def456
+        - name: format
+          in: query
+          description: Report format
+          schema:
+            type: string
+            enum: [json, sarif, markdown, html, csv]
+            default: json
+          example: html
+      responses:
+        '200':
+          description: Generated report
+          content:
+            application/json:
+              schema:
+                type: object
+            text/html:
+              schema:
+                type: string
+            text/markdown:
+              schema:
+                type: string
+            text/csv:
+              schema:
+                type: string
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '501':
+          description: Report generation not yet implemented
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+
+  /analytics/trends:
+    get:
+      tags:
+        - Analytics
+      summary: Get finding trends
+      description: |
+        Retrieve historical trend data for security findings.
+        Shows how finding counts by severity have changed over time.
+      operationId: getTrends
+      parameters:
+        - name: start
+          in: query
+          description: Start date (ISO 8601)
+          schema:
+            type: string
+            format: date-time
+          example: '2026-01-01T00:00:00Z'
+        - name: end
+          in: query
+          description: End date (ISO 8601)
+          schema:
+            type: string
+            format: date-time
+          example: '2026-03-01T00:00:00Z'
+        - name: interval
+          in: query
+          description: Time interval for grouping
+          schema:
+            type: string
+            enum: [day, week, month]
+            default: week
+          example: week
+      responses:
+        '200':
+          description: Trend data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrendsResponse'
+              example:
+                dates:
+                  - '2026-01-01'
+                  - '2026-01-08'
+                  - '2026-01-15'
+                critical: [5, 3, 2]
+                high: [12, 10, 8]
+                medium: [25, 22, 20]
+                low: [15, 14, 12]
+        '501':
+          description: Analytics not yet implemented
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+
+components:
+  parameters:
+    Page:
+      name: page
+      in: query
+      description: Page number (1-indexed)
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+      example: 1
+
+    PageSize:
+      name: page_size
+      in: query
+      description: Number of items per page
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 50
+      example: 50
+
+  schemas:
+    HealthResponse:
+      type: object
+      required:
+        - status
+        - version
+      properties:
+        status:
+          type: string
+          description: Health status
+          enum: [ok, degraded, error]
+          example: ok
+        version:
+          type: string
+          description: API version
+          example: 1.2.0
+
+    ScanRequest:
+      type: object
+      required:
+        - path
+      properties:
+        path:
+          type: string
+          description: Path to scan
+          example: /path/to/code
+        scanners:
+          type: array
+          description: List of scanners to use (optional, defaults to all available)
+          items:
+            type: string
+            enum: [bandit, semgrep, gosec, eslint]
+          example: [bandit, semgrep]
+        policies:
+          type: array
+          description: List of policy files to apply (optional)
+          items:
+            type: string
+          example: [./policies/security.yaml]
+
+    ScanResponse:
+      type: object
+      required:
+        - scan_id
+        - status
+        - started
+      properties:
+        scan_id:
+          type: string
+          description: Unique scan identifier
+          example: abc123def456
+        status:
+          type: string
+          description: Current scan status
+          enum: [pending, running, completed, failed]
+          example: running
+        started:
+          type: string
+          format: date-time
+          description: Scan start time (RFC3339)
+          example: '2026-03-03T10:00:00Z'
+
+    ScanListResponse:
+      type: object
+      required:
+        - scans
+        - total
+        - page
+        - page_size
+      properties:
+        scans:
+          type: array
+          items:
+            $ref: '#/components/schemas/ScanSummary'
+        total:
+          type: integer
+          description: Total number of scans
+          example: 150
+        page:
+          type: integer
+          description: Current page number
+          example: 1
+        page_size:
+          type: integer
+          description: Items per page
+          example: 50
+
+    ScanSummary:
+      type: object
+      required:
+        - scan_id
+        - target_path
+        - status
+        - start_time
+        - duration
+        - total_findings
+      properties:
+        scan_id:
+          type: string
+          description: Unique scan identifier
+          example: abc123def456
+        target_path:
+          type: string
+          description: Path that was scanned
+          example: /path/to/code
+        status:
+          type: string
+          description: Scan status
+          enum: [pending, running, completed, failed]
+          example: completed
+        start_time:
+          type: string
+          format: date-time
+          description: Scan start time (RFC3339)
+          example: '2026-03-03T10:00:00Z'
+        end_time:
+          type: string
+          format: date-time
+          description: Scan end time (RFC3339, optional)
+          example: '2026-03-03T10:05:00Z'
+        duration:
+          type: integer
+          format: int64
+          description: Scan duration in seconds
+          example: 300
+        total_findings:
+          type: integer
+          description: Total number of findings
+          example: 42
+
+    ScanDetail:
+      type: object
+      required:
+        - scan_id
+        - target_path
+        - status
+        - start_time
+        - duration
+        - offline_verified
+        - config_hash
+        - total_findings
+        - critical_count
+        - high_count
+        - medium_count
+        - low_count
+        - findings
+      properties:
+        scan_id:
+          type: string
+          description: Unique scan identifier
+          example: abc123def456
+        target_path:
+          type: string
+          description: Path that was scanned
+          example: /path/to/code
+        status:
+          type: string
+          description: Scan status
+          enum: [pending, running, completed, failed]
+          example: completed
+        start_time:
+          type: string
+          format: date-time
+          description: Scan start time (RFC3339)
+          example: '2026-03-03T10:00:00Z'
+        end_time:
+          type: string
+          format: date-time
+          description: Scan end time (RFC3339, optional)
+          example: '2026-03-03T10:05:00Z'
+        duration:
+          type: integer
+          format: int64
+          description: Scan duration in seconds
+          example: 300
+        offline_verified:
+          type: boolean
+          description: Whether scan was verified offline
+          example: true
+        config_hash:
+          type: string
+          description: Hash of scan configuration
+          example: sha256:abc123...
+        total_findings:
+          type: integer
+          description: Total number of findings
+          example: 42
+        critical_count:
+          type: integer
+          description: Number of critical findings
+          example: 2
+        high_count:
+          type: integer
+          description: Number of high severity findings
+          example: 8
+        medium_count:
+          type: integer
+          description: Number of medium severity findings
+          example: 20
+        low_count:
+          type: integer
+          description: Number of low severity findings
+          example: 12
+        findings:
+          type: array
+          description: List of all findings from this scan
+          items:
+            $ref: '#/components/schemas/NormalizedFinding'
+
+    FindingsResponse:
+      type: object
+      required:
+        - findings
+        - total
+        - page
+        - page_size
+      properties:
+        findings:
+          type: array
+          items:
+            $ref: '#/components/schemas/NormalizedFinding'
+        total:
+          type: integer
+          description: Total number of findings matching filters
+          example: 150
+        page:
+          type: integer
+          description: Current page number
+          example: 1
+        page_size:
+          type: integer
+          description: Items per page
+          example: 50
+
+    NormalizedFinding:
+      type: object
+      required:
+        - id
+        - finding_id
+        - cwe_id
+        - cwe_description
+        - severity
+        - confidence
+        - code_fingerprint
+        - file_path
+        - line_number
+        - description
+      properties:
+        id:
+          type: string
+          description: Normalized finding ID (unique across scans)
+          example: finding-001
+        finding_id:
+          type: string
+          description: Original scanner finding ID
+          example: bandit-B201
+        cwe_id:
+          type: string
+          description: CWE identifier
+          example: CWE-89
+        cwe_description:
+          type: string
+          description: CWE description
+          example: SQL Injection
+        severity:
+          type: string
+          description: Severity level
+          enum: [critical, high, medium, low]
+          example: critical
+        confidence:
+          type: string
+          description: Confidence level
+          enum: [high, medium, low]
+          example: high
+        code_fingerprint:
+          type: string
+          description: Fingerprint for deduplication
+          example: abc123def456
+        file_path:
+          type: string
+          description: Path to file containing the finding
+          example: app/auth.py
+        line_number:
+          type: integer
+          description: Line number where finding was detected
+          example: 42
+        description:
+          type: string
+          description: Detailed description of the finding
+          example: Possible SQL injection vulnerability detected
+
+    ImportRequest:
+      type: object
+      required:
+        - format
+        - mode
+        - data
+      properties:
+        format:
+          type: string
+          description: Import format
+          enum: [sarif, json]
+          example: sarif
+        mode:
+          type: string
+          description: Import mode
+          enum: [replace, merge, skip]
+          example: merge
+        run_id:
+          type: string
+          description: Optional custom run ID
+          example: custom-scan-001
+        target_path:
+          type: string
+          description: Optional target path
+          example: /path/to/code
+        tool_name:
+          type: string
+          description: Optional tool name
+          example: custom-scanner
+        data:
+          type: string
+          description: Base64 encoded file content or raw JSON
+          example: eyJmaW5kaW5ncyI6W119
+
+    ImportResponse:
+      type: object
+      required:
+        - run_id
+        - total_findings
+        - imported_findings
+        - skipped_findings
+        - failed_findings
+      properties:
+        run_id:
+          type: string
+          description: Run ID for imported findings
+          example: custom-scan-001
+        total_findings:
+          type: integer
+          description: Total findings in import file
+          example: 100
+        imported_findings:
+          type: integer
+          description: Successfully imported findings
+          example: 95
+        skipped_findings:
+          type: integer
+          description: Skipped findings (duplicates)
+          example: 3
+        failed_findings:
+          type: integer
+          description: Failed to import
+          example: 2
+        errors:
+          type: array
+          description: Import errors (if any)
+          items:
+            type: string
+          example: ['Line 42: Invalid CWE ID']
+
+    PolicyValidateRequest:
+      type: object
+      required:
+        - policy_yaml
+      properties:
+        policy_yaml:
+          type: string
+          description: Policy YAML content to validate
+          example: |
+            version: 1
+            rules:
+              - name: Block critical findings
+                severity: critical
+                action: fail
+
+    PolicyValidateResponse:
+      type: object
+      required:
+        - valid
+      properties:
+        valid:
+          type: boolean
+          description: Whether the policy is valid
+          example: true
+        errors:
+          type: array
+          description: Validation errors (if invalid)
+          items:
+            type: string
+          example: ['Line 5: Unknown action "block"']
+
+    TrendsResponse:
+      type: object
+      required:
+        - dates
+        - critical
+        - high
+        - medium
+        - low
+      properties:
+        dates:
+          type: array
+          description: Date labels for trend data
+          items:
+            type: string
+            format: date
+          example: ['2026-01-01', '2026-01-08', '2026-01-15']
+        critical:
+          type: array
+          description: Critical finding counts
+          items:
+            type: integer
+          example: [5, 3, 2]
+        high:
+          type: array
+          description: High severity finding counts
+          items:
+            type: integer
+          example: [12, 10, 8]
+        medium:
+          type: array
+          description: Medium severity finding counts
+          items:
+            type: integer
+          example: [25, 22, 20]
+        low:
+          type: array
+          description: Low severity finding counts
+          items:
+            type: integer
+          example: [15, 14, 12]
+
+    APIError:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          description: Error code
+          enum:
+            - INVALID_REQUEST
+            - NOT_FOUND
+            - UNAUTHORIZED
+            - INTERNAL_ERROR
+            - SCANNER_FAILED
+            - LLM_FAILED
+          example: INVALID_REQUEST
+        message:
+          type: string
+          description: Human-readable error message
+          example: Path is required
+        details:
+          type: object
+          description: Additional error details
+          additionalProperties: true
+          example:
+            field: path
+            constraint: required
+
+  responses:
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/APIError'
+          example:
+            code: INVALID_REQUEST
+            message: Path is required
+            details:
+              field: path
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/APIError'
+          example:
+            code: NOT_FOUND
+            message: Scan not found
+
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/APIError'
+          example:
+            code: INTERNAL_ERROR
+            message: Failed to retrieve scans

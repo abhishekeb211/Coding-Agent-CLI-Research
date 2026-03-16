@@ -1,0 +1,24 @@
+policies:
+  - id: xss-prevention
+    name: "Cross-Site Scripting (XSS) Prevention"
+    description: "Prevent XSS vulnerabilities in web applications"
+    cwe: ["79"]
+    severity: high
+    action: deny
+    enabled: true
+
+  - id: open-redirect
+    name: "Open Redirect Prevention"
+    description: "Prevent open redirect vulnerabilities"
+    cwe: ["601"]
+    severity: medium
+    action: warn
+    enabled: true
+
+  - id: ssrf-prevention
+    name: "Server-Side Request Forgery (SSRF) Prevention"
+    description: "Prevent SSRF vulnerabilities"
+    cwe: ["918"]
+    severity: high
+    action: deny
+    enabled: true

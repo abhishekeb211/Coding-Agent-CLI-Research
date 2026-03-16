@@ -1,0 +1,366 @@
+package policy
+
+import (
+	"os"
+	"path/filepath"
+	"testing"
+)
+
+// BenchmarkJSONReportGeneration benchmarks JSON report generation
+func BenchmarkJSONReportGeneration(b *testing.B) {
+	findings := generateBenchFindings(1000)
+	tempDir := setupBenchDir(b)
+	defer os.RemoveAll(tempDir)
+
+	reportPath := filepath.Join(tempDir, "report.json")
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		err := GenerateJSONReport(findings, reportPath)
+		if err != nil {
+			b.Fatalf("Failed to generate JSON report: %v", err)
+		}
+	}
+}
+
+// BenchmarkHTMLReportGeneration benchmarks HTML report generation
+func BenchmarkHTMLReportGeneration(b *testing.B) {
+	findings := generateBenchFindings(1000)
+	tempDir := setupBenchDir(b)
+	defer os.RemoveAll(tempDir)
+
+	reportPath := filepath.Join(tempDir, "report.html")
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		err := GenerateHTMLReport(findings, reportPath)
+		if err != nil {
+			b.Fatalf("Failed to generate HTML report: %v", err)
+		}
+	}
+}
+
+// BenchmarkCSVReportGeneration benchmarks CSV report generation
+func BenchmarkCSVReportGeneration(b *testing.B) {
+	findings := generateBenchFindings(1000)
+	tempDir := setupBenchDir(b)
+	defer os.RemoveAll(tempDir)
+
+	reportPath := filepath.Join(tempDir, "report.csv")
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		err := GenerateCSVReport(findings, reportPath)
+		if err != nil {
+			b.Fatalf("Failed to generate CSV report: %v", err)
+		}
+	}
+}
+
+// BenchmarkMarkdownReportGeneration benchmarks Markdown report generation
+func BenchmarkMarkdownReportGeneration(b *testing.B) {
+	findings := generateBenchFindings(1000)
+	tempDir := setupBenchDir(b)
+	defer os.RemoveAll(tempDir)
+
+	reportPath := filepath.Join(tempDir, "report.md")
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		err := GenerateMarkdownReport(findings, reportPath)
+		if err != nil {
+			b.Fatalf("Failed to generate Markdown report: %v", err)
+		}
+	}
+}
+
+// BenchmarkSARIFReportGeneration benchmarks SARIF report generation
+func BenchmarkSARIFReportGeneration(b *testing.B) {
+	findings := generateBenchFindings(1000)
+	tempDir := setupBenchDir(b)
+	defer os.RemoveAll(tempDir)
+
+	reportPath := filepath.Join(tempDir, "report.sarif")
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		err := GenerateSARIFReport(findings, reportPath)
+		if err != nil {
+			b.Fatalf("Failed to generate SARIF report: %v", err)
+		}
+	}
+}
+
+// BenchmarkReportWith100Findings benchmarks report generation with 100 findings
+func BenchmarkReportWith100Findings(b *testing.B) {
+	findings := generateBenchFindings(100)
+	tempDir := setupBenchDir(b)
+	defer os.RemoveAll(tempDir)
+
+	reportPath := filepath.Join(tempDir, "report.json")
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		GenerateJSONReport(findings, reportPath)
+	}
+}
+
+// BenchmarkReportWith1KFindings benchmarks report generation with 1K findings
+func BenchmarkReportWith1KFindings(b *testing.B) {
+	findings := generateBenchFindings(1000)
+	tempDir := setupBenchDir(b)
+	defer os.RemoveAll(tempDir)
+
+	reportPath := filepath.Join(tempDir, "report.json")
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		GenerateJSONReport(findings, reportPath)
+	}
+}
+
+// BenchmarkReportWith10KFindings benchmarks report generation with 10K findings
+func BenchmarkReportWith10KFindings(b *testing.B) {
+	findings := generateBenchFindings(10000)
+	tempDir := setupBenchDir(b)
+	defer os.RemoveAll(tempDir)
+
+	reportPath := filepath.Join(tempDir, "report.json")
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		GenerateJSONReport(findings, reportPath)
+	}
+}
+
+// BenchmarkReportMemoryUsage measures memory usage during report generation
+func BenchmarkReportMemoryUsage(b *testing.B) {
+	findings := generateBenchFindings(5000)
+	tempDir := setupBenchDir(b)
+	defer os.RemoveAll(tempDir)
+
+	reportPath := filepath.Join(tempDir, "report.json")
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		GenerateJSONReport(findings, reportPath)
+	}
+}
+
+// BenchmarkComplianceReportGeneration benchmarks compliance report generation
+func BenchmarkComplianceReportGeneration(b *testing.B) {
+	findings := generateBenchFindings(1000)
+	policy := &Policy{
+		Name:                "OWASP Top 10",
+		ComplianceFramework: "OWASP-2021",
+		Rules:               generateBenchRules(50),
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = GenerateComplianceReport(policy, findings)
+	}
+}
+
+// BenchmarkReportSummaryGeneration benchmarks summary generation
+func BenchmarkReportSummaryGeneration(b *testing.B) {
+	findings := generateBenchFindings(10000)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = GenerateSummary(findings)
+	}
+}
+
+// BenchmarkReportFiltering benchmarks filtering findings for reports
+func BenchmarkReportFiltering(b *testing.B) {
+	findings := generateBenchFindings(10000)
+
+	filter := FindingFilter{
+		Severity: "high",
+		CWE:      "CWE-89",
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = FilterFindings(findings, filter)
+	}
+}
+
+// BenchmarkReportSorting benchmarks sorting findings for reports
+func BenchmarkReportSorting(b *testing.B) {
+	findings := generateBenchFindings(10000)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = SortFindingsBySeverity(findings)
+	}
+}
+
+// BenchmarkReportGrouping benchmarks grouping findings by category
+func BenchmarkReportGrouping(b *testing.B) {
+	findings := generateBenchFindings(10000)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = GroupFindingsByCWE(findings)
+	}
+}
+
+// BenchmarkHTMLTemplateRendering benchmarks HTML template rendering
+func BenchmarkHTMLTemplateRendering(b *testing.B) {
+	findings := generateBenchFindings(1000)
+	tempDir := setupBenchDir(b)
+	defer os.RemoveAll(tempDir)
+
+	template := loadHTMLTemplate()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = renderHTMLTemplate(template, findings)
+	}
+}
+
+// BenchmarkConcurrentReportGeneration benchmarks concurrent report generation
+func BenchmarkConcurrentReportGeneration(b *testing.B) {
+	findings := generateBenchFindings(1000)
+	tempDir := setupBenchDir(b)
+	defer os.RemoveAll(tempDir)
+
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		i := 0
+		for pb.Next() {
+			reportPath := filepath.Join(tempDir, "report-"+string(rune(i))+".json")
+			GenerateJSONReport(findings, reportPath)
+			i++
+		}
+	})
+}
+
+// BenchmarkReportWithLongDescriptions benchmarks reports with long descriptions
+func BenchmarkReportWithLongDescriptions(b *testing.B) {
+	findings := generateBenchFindingsWithLongDesc(1000)
+	tempDir := setupBenchDir(b)
+	defer os.RemoveAll(tempDir)
+
+	reportPath := filepath.Join(tempDir, "report.json")
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		GenerateJSONReport(findings, reportPath)
+	}
+}
+
+// Helper functions
+
+func setupBenchDir(b *testing.B) string {
+	b.Helper()
+
+	tempDir, err := os.MkdirTemp("", "bench-report-*")
+	if err != nil {
+		b.Fatalf("Failed to create temp dir: %v", err)
+	}
+
+	return tempDir
+}
+
+func generateBenchFindings(count int) []Finding {
+	findings := make([]Finding, count)
+	severities := []string{"low", "medium", "high", "critical"}
+	cwes := []string{"CWE-89", "CWE-79", "CWE-78", "CWE-798", "CWE-22"}
+
+	for i := 0; i < count; i++ {
+		findings[i] = Finding{
+			ID:          "finding-" + string(rune(i)),
+			RuleID:      "rule-" + string(rune(i%20)),
+			Severity:    severities[i%4],
+			CWE:         cwes[i%5],
+			Description: "Security vulnerability detected",
+			FilePath:    "file" + string(rune(i%100)) + ".py",
+			LineNumber:  i % 1000,
+			Scanner:     "bandit",
+		}
+	}
+
+	return findings
+}
+
+func generateBenchFindingsWithLongDesc(count int) []Finding {
+	findings := generateBenchFindings(count)
+
+	longDesc := "This is a very long description that contains detailed information about the security vulnerability. " +
+		"It includes the root cause, potential impact, affected components, and recommended remediation steps. " +
+		"The description may span multiple lines and contain technical details that are important for developers to understand."
+
+	for i := range findings {
+		findings[i].Description = longDesc
+	}
+
+	return findings
+}
+
+func generateBenchRules(count int) []Rule {
+	rules := make([]Rule, count)
+
+	for i := 0; i < count; i++ {
+		rules[i] = Rule{
+			ID:          "rule-" + string(rune(i)),
+			Description: "Security rule " + string(rune(i)),
+			Severity:    "high",
+			Action:      "block",
+		}
+	}
+
+	return rules
+}
+
+func loadHTMLTemplate() *Template {
+	// Simplified template loading for benchmarking
+	return &Template{
+		Name:    "report",
+		Content: "<html><body>{{.}}</body></html>",
+	}
+}
+
+func renderHTMLTemplate(template *Template, findings []Finding) string {
+	// Simplified template rendering for benchmarking
+	return "<html><body>Report with " + string(rune(len(findings))) + " findings</body></html>"
+}
+
+// Supporting types for benchmarking
+
+type Finding struct {
+	ID          string
+	RuleID      string
+	Severity    string
+	CWE         string
+	Description string
+	FilePath    string
+	LineNumber  int
+	Scanner     string
+}
+
+type Policy struct {
+	Name                string
+	ComplianceFramework string
+	Rules               []Rule
+}
+
+type Rule struct {
+	ID          string
+	Description string
+	Severity    string
+	Action      string
+}
+
+type FindingFilter struct {
+	Severity string
+	CWE      string
+}
+
+type Template struct {
+	Name    string
+	Content string
+}

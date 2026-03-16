@@ -1,0 +1,59 @@
+{
+  "errors": [],
+  "paths": {
+    "scanned": ["testdata/vulnerable-code/xss-vulnerability.js"]
+  },
+  "results": [
+    {
+      "check_id": "javascript.lang.security.audit.xss.direct-html-injection",
+      "path": "testdata/vulnerable-code/xss-vulnerability.js",
+      "start": {
+        "line": 5,
+        "col": 5
+      },
+      "end": {
+        "line": 5,
+        "col": 55
+      },
+      "extra": {
+        "message": "Detected direct HTML injection. This could lead to XSS attacks.",
+        "metadata": {
+          "cwe": ["CWE-79"],
+          "owasp": ["A03:2021 - Injection"],
+          "confidence": "HIGH",
+          "likelihood": "HIGH",
+          "impact": "MEDIUM",
+          "subcategory": ["vuln"]
+        },
+        "severity": "WARNING",
+        "lines": "    document.getElementById('output').innerHTML = input;"
+      }
+    },
+    {
+      "check_id": "javascript.lang.security.audit.eval-detected",
+      "path": "testdata/vulnerable-code/xss-vulnerability.js",
+      "start": {
+        "line": 14,
+        "col": 5
+      },
+      "end": {
+        "line": 14,
+        "col": 16
+      },
+      "extra": {
+        "message": "Detected use of eval(). This is dangerous and could lead to code injection.",
+        "metadata": {
+          "cwe": ["CWE-95"],
+          "owasp": ["A03:2021 - Injection"],
+          "confidence": "HIGH",
+          "likelihood": "MEDIUM",
+          "impact": "HIGH",
+          "subcategory": ["vuln"]
+        },
+        "severity": "ERROR",
+        "lines": "    eval(code);"
+      }
+    }
+  ],
+  "version": "1.45.0"
+}
