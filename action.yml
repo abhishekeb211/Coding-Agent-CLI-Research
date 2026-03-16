@@ -1,0 +1,28 @@
+name: 'Coding Agent CLI Scanner'
+description: 'Automated security scanning with Coding Agent CLI'
+inputs:
+  path:
+    description: 'Path to scan'
+    required: false
+    default: '.'
+  output:
+    description: 'Output path for SARIF report'
+    required: false
+    default: 'results.sarif'
+  severity:
+    description: 'Filter by severity'
+    required: false
+    default: 'critical,high,medium'
+runs:
+  using: 'docker'
+  image: 'Dockerfile'
+  args:
+    - 'scan'
+    - '--path'
+    - ${{ inputs.path }}
+    - '--format'
+    - 'sarif'
+    - '--output'
+    - ${{ inputs.output }}
+    - '--severity'
+    - ${{ inputs.severity }}
