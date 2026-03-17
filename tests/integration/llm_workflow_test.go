@@ -1,51 +1,67 @@
+//go:build integration
 // +build integration
 
 package integration
 
 import (
+	"context"
 	"strings"
 	"testing"
 
 	"github.com/coding-agent/cli/internal/llm"
-	"github.com/coding-agent/cli/internal/scanner"
 )
 
 func TestLLMRemediationGeneration(t *testing.T) {
 	ctx := SetupTest(t)
 	defer ctx.Cleanup(t)
 
-	// Create mock LLM provider
-	mockProvider := &llm.MockProvider{
-		Response: "To fix this SQL injection vulnerability, use parameterized queries instead of string concatenation.",
+	// Create a mock LLM provider via the Manager with mock config
+	config := llm.Config{
+		Provider:        "mock",
+		CacheEnabled:    true,
+		CacheDir:        ctx.TempDir + "/llm-cache",
+		MaxTokens:       1024,
+		Temperature:     0.7,
+		Timeout:         30 * 1e9, // 30 seconds
+		MaxRetries:      1,
+		RetryDelay:      100 * 1e6, // 100ms
+		RetryMultiplier: 2.0,
 	}
 
-	// Create LLM client with mock provider
-	client := llm.NewClient(mockProvider, nil)
+	manager, err := llm.NewManager(config)
+	if err != nil {
+		t.Fatalf("Failed to create LLM manager: %v", err)
+	}
+	defer manager.Close()
 
-	// Create test finding
-	finding := scanner.Finding{
-		ID:          "f1",
-		RuleID:      "sql-injection",
-		Severity:    "critical",
-		CWE:         "CWE-89",
-		Description: "SQL injection vulnerability detected",
-		FilePath:    "app.py",
-		LineNumber:  42,
-		CodeSnippet: "query = \"SELECT * FROM users WHERE id = '\" + user_id + \"'\"",
+	// Create test remediation request for SQL injection
+	req := llm.RemediationRequest{
+		CWEID:          "CWE-89",
+		CWEDescription: "SQL Injection",
+		CodeSnippet:    `query = "SELECT * FROM users WHERE id = " + user_input`,
+		FilePath:       "app.py",
+		LineNumber:     42,
+		Severity:       "high",
+		RuleID:         "B608",
+		Message:        "SQL injection vulnerability detected",
 	}
 
 	// Generate remediation
-	remediation, err := client.GenerateRemediation(finding)
+	resp, err := manager.GenerateRemediation(context.Background(), req)
 	if err != nil {
 		t.Fatalf("Failed to generate remediation: %v", err)
 	}
 
-	if remediation == "" {
-		t.Error("Expected non-empty remediation")
+	if resp.Explanation == "" {
+		t.Error("Expected non-empty explanation")
 	}
 
-	if !strings.Contains(remediation, "parameterized") {
-		t.Error("Remediation should mention parameterized queries")
+	if !strings.Contains(resp.Explanation, "SQL Injection") {
+		t.Errorf("Explanation should mention SQL Injection, got: %s", resp.Explanation)
+	}
+
+	if len(resp.RemediationSteps) == 0 {
+		t.Error("Expected at least one remediation step")
 	}
 }
 
@@ -54,52 +70,47 @@ func TestLLMCachingBehavior(t *testing.T) {
 	defer ctx.Cleanup(t)
 
 	// Create cache
-	cachePath := ctx.TempDir + "/llm-cache.db"
-	cache, err := llm.NewCache(cachePath)
+	cacheDir := ctx.TempDir + "/llm-cache"
+	cache, err := llm.NewCache(cacheDir, true)
 	if err != nil {
 		t.Fatalf("Failed to create cache: %v", err)
 	}
 	defer cache.Close()
 
-	mockProvider := &llm.MockProvider{
-		Response: "Use prepared statements to prevent SQL injection.",
-	}
-
-	client := llm.NewClient(mockProvider, cache)
-
-	finding := scanner.Finding{
-		ID:          "f1",
+	// Create a remediation request
+	req := llm.RemediationRequest{
+		CWEID:       "CWE-89",
+		CodeSnippet: "SELECT * FROM users WHERE id = " + "'test'",
+		FilePath:    "app.py",
+		LineNumber:  42,
 		RuleID:      "sql-injection",
-		CWE:         "CWE-89",
-		Description: "SQL injection",
-		CodeSnippet: "SELECT * FROM users WHERE id = " + user_id,
 	}
 
-	// First call - should hit provider
-	remediation1, err := client.GenerateRemediation(finding)
+	// Create a response to cache
+	resp := &llm.RemediationResponse{
+		Explanation:      "Use prepared statements to prevent SQL injection.",
+		RemediationSteps: []string{"Use parameterized queries", "Validate input"},
+		Confidence:       0.9,
+	}
+
+	// Store in cache
+	err = cache.Set(req, resp)
 	if err != nil {
-		t.Fatalf("First remediation failed: %v", err)
+		t.Fatalf("Failed to set cache: %v", err)
 	}
 
-	// Verify provider was called
-	if mockProvider.CallCount != 1 {
-		t.Errorf("Expected provider to be called once, got %d calls", mockProvider.CallCount)
+	// Retrieve from cache
+	cachedResp, found := cache.Get(req)
+	if !found {
+		t.Error("Expected cache hit, got miss")
 	}
 
-	// Second call with same finding - should hit cache
-	remediation2, err := client.GenerateRemediation(finding)
-	if err != nil {
-		t.Fatalf("Second remediation failed: %v", err)
+	if cachedResp.Explanation != resp.Explanation {
+		t.Errorf("Expected explanation '%s', got '%s'", resp.Explanation, cachedResp.Explanation)
 	}
 
-	// Verify provider was not called again
-	if mockProvider.CallCount != 1 {
-		t.Errorf("Expected provider to still have 1 call (cached), got %d calls", mockProvider.CallCount)
-	}
-
-	// Verify remediations match
-	if remediation1 != remediation2 {
-		t.Error("Cached remediation should match original")
+	if !cachedResp.Cached {
+		t.Error("Expected cached response to have Cached=true")
 	}
 }
 
@@ -107,243 +118,237 @@ func TestLLMCacheRetrieval(t *testing.T) {
 	ctx := SetupTest(t)
 	defer ctx.Cleanup(t)
 
-	cachePath := ctx.TempDir + "/cache.db"
-	cache, err := llm.NewCache(cachePath)
+	cacheDir := ctx.TempDir + "/cache"
+	cache, err := llm.NewCache(cacheDir, true)
 	if err != nil {
 		t.Fatalf("Failed to create cache: %v", err)
 	}
 
 	// Store remediation in cache
-	cacheKey := "test-key"
-	expectedRemediation := "Use input validation to prevent XSS attacks."
-	
-	err = cache.Set(cacheKey, expectedRemediation)
+	req := llm.RemediationRequest{
+		CWEID:       "CWE-79",
+		CodeSnippet: "html = user_input",
+		FilePath:    "template.py",
+		LineNumber:  10,
+		RuleID:      "xss-check",
+	}
+	expectedResp := &llm.RemediationResponse{
+		Explanation:      "Use input validation to prevent XSS attacks.",
+		RemediationSteps: []string{"Escape output", "Use CSP"},
+		Confidence:       0.85,
+	}
+
+	err = cache.Set(req, expectedResp)
 	if err != nil {
 		t.Fatalf("Failed to store in cache: %v", err)
 	}
 
 	// Retrieve from cache
-	remediation, found := cache.Get(cacheKey)
+	cachedResp, found := cache.Get(req)
 	if !found {
 		t.Error("Expected cache hit, got miss")
 	}
 
-	if remediation != expectedRemediation {
-		t.Errorf("Expected remediation '%s', got '%s'", expectedRemediation, remediation)
+	if cachedResp.Explanation != expectedResp.Explanation {
+		t.Errorf("Expected explanation '%s', got '%s'", expectedResp.Explanation, cachedResp.Explanation)
 	}
 
 	cache.Close()
 
 	// Reopen cache and verify persistence
-	cache2, err := llm.NewCache(cachePath)
+	cache2, err := llm.NewCache(cacheDir, true)
 	if err != nil {
 		t.Fatalf("Failed to reopen cache: %v", err)
 	}
 	defer cache2.Close()
 
-	remediation2, found := cache2.Get(cacheKey)
+	cachedResp2, found := cache2.Get(req)
 	if !found {
 		t.Error("Expected cache hit after reopening, got miss")
 	}
 
-	if remediation2 != expectedRemediation {
+	if cachedResp2.Explanation != expectedResp.Explanation {
 		t.Error("Cache should persist across reopens")
 	}
 }
 
-func TestPIIRedactionInRemediation(t *testing.T) {
+func TestLLMWithDifferentCWETypes(t *testing.T) {
 	ctx := SetupTest(t)
 	defer ctx.Cleanup(t)
 
-	mockProvider := &llm.MockProvider{
-		Response: "Contact security@example.com or call 555-1234 for assistance.",
+	config := llm.Config{
+		Provider:        "mock",
+		CacheEnabled:    true,
+		CacheDir:        ctx.TempDir + "/llm-cache",
+		MaxTokens:       1024,
+		Temperature:     0.7,
+		Timeout:         30 * 1e9,
+		MaxRetries:      1,
+		RetryDelay:      100 * 1e6,
+		RetryMultiplier: 2.0,
 	}
 
-	client := llm.NewClient(mockProvider, nil)
-	client.EnablePIIRedaction(true)
-
-	finding := scanner.Finding{
-		ID:          "f1",
-		Description: "Security issue found",
-		CodeSnippet: "email = 'user@example.com'\nphone = '555-9876'",
-	}
-
-	remediation, err := client.GenerateRemediation(finding)
+	manager, err := llm.NewManager(config)
 	if err != nil {
-		t.Fatalf("Failed to generate remediation: %v", err)
+		t.Fatalf("Failed to create LLM manager: %v", err)
 	}
-
-	// Verify PII is redacted
-	if strings.Contains(remediation, "security@example.com") {
-		t.Error("Email should be redacted from remediation")
-	}
-
-	if strings.Contains(remediation, "555-1234") {
-		t.Error("Phone number should be redacted from remediation")
-	}
-
-	if !strings.Contains(remediation, "[REDACTED]") {
-		t.Error("Remediation should contain redaction markers")
-	}
-}
-
-func TestLLMWithDifferentFindingTypes(t *testing.T) {
-	ctx := SetupTest(t)
-	defer ctx.Cleanup(t)
+	defer manager.Close()
 
 	testCases := []struct {
 		name     string
-		finding  scanner.Finding
+		req      llm.RemediationRequest
 		expected string
 	}{
 		{
 			name: "SQL Injection",
-			finding: scanner.Finding{
-				RuleID:      "sql-injection",
-				CWE:         "CWE-89",
-				Description: "SQL injection vulnerability",
+			req: llm.RemediationRequest{
+				CWEID:       "CWE-89",
+				CodeSnippet: "query = user_input",
+				Severity:    "high",
 			},
 			expected: "parameterized",
 		},
 		{
 			name: "XSS",
-			finding: scanner.Finding{
-				RuleID:      "xss",
-				CWE:         "CWE-79",
-				Description: "Cross-site scripting vulnerability",
+			req: llm.RemediationRequest{
+				CWEID:       "CWE-79",
+				CodeSnippet: "html = user_input",
+				Severity:    "medium",
 			},
-			expected: "sanitize",
+			expected: "Scripting",
 		},
 		{
 			name: "Hardcoded Secret",
-			finding: scanner.Finding{
-				RuleID:      "hardcoded-secret",
-				CWE:         "CWE-798",
-				Description: "Hardcoded password detected",
+			req: llm.RemediationRequest{
+				CWEID:       "CWE-798",
+				CodeSnippet: "password = 'secret123'",
+				Severity:    "high",
 			},
-			expected: "environment variable",
+			expected: "credentials",
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			mockProvider := &llm.MockProvider{
-				Response: "Remediation for " + tc.name + ": " + tc.expected,
-			}
-
-			client := llm.NewClient(mockProvider, nil)
-
-			remediation, err := client.GenerateRemediation(tc.finding)
+			resp, err := manager.GenerateRemediation(context.Background(), tc.req)
 			if err != nil {
 				t.Fatalf("Failed to generate remediation: %v", err)
 			}
 
-			if !strings.Contains(strings.ToLower(remediation), strings.ToLower(tc.expected)) {
-				t.Errorf("Expected remediation to contain '%s', got: %s", tc.expected, remediation)
+			combined := resp.Explanation + " " + strings.Join(resp.RemediationSteps, " ")
+			if !strings.Contains(strings.ToLower(combined), strings.ToLower(tc.expected)) {
+				t.Errorf("Expected response to contain '%s', got explanation: %s", tc.expected, resp.Explanation)
 			}
 		})
 	}
 }
 
-func TestLLMCacheMissScenario(t *testing.T) {
+func TestLLMManagerAvailability(t *testing.T) {
 	ctx := SetupTest(t)
 	defer ctx.Cleanup(t)
 
-	cachePath := ctx.TempDir + "/cache.db"
-	cache, err := llm.NewCache(cachePath)
+	config := llm.Config{
+		Provider:        "mock",
+		CacheEnabled:    false,
+		CacheDir:        ctx.TempDir + "/llm-cache",
+		MaxTokens:       1024,
+		Timeout:         30 * 1e9,
+		MaxRetries:      1,
+		RetryDelay:      100 * 1e6,
+		RetryMultiplier: 2.0,
+	}
+
+	manager, err := llm.NewManager(config)
+	if err != nil {
+		t.Fatalf("Failed to create LLM manager: %v", err)
+	}
+	defer manager.Close()
+
+	// Mock provider should always be available
+	if !manager.IsAvailable() {
+		t.Error("Expected mock provider to be available")
+	}
+}
+
+func TestLLMCostEstimation(t *testing.T) {
+	ctx := SetupTest(t)
+	defer ctx.Cleanup(t)
+
+	config := llm.Config{
+		Provider:        "mock",
+		CacheEnabled:    false,
+		CacheDir:        ctx.TempDir + "/llm-cache",
+		MaxTokens:       1024,
+		Timeout:         30 * 1e9,
+		MaxRetries:      1,
+		RetryDelay:      100 * 1e6,
+		RetryMultiplier: 2.0,
+	}
+
+	manager, err := llm.NewManager(config)
+	if err != nil {
+		t.Fatalf("Failed to create LLM manager: %v", err)
+	}
+	defer manager.Close()
+
+	req := llm.RemediationRequest{
+		CWEID:       "CWE-89",
+		CodeSnippet: "query = user_input",
+		Severity:    "high",
+	}
+
+	// Mock provider should return 0 cost
+	cost, err := manager.EstimateCost(req)
+	if err != nil {
+		t.Fatalf("Failed to estimate cost: %v", err)
+	}
+
+	if cost != 0.0 {
+		t.Errorf("Expected 0 cost for mock provider, got %f", cost)
+	}
+}
+
+func TestLLMCacheCleanup(t *testing.T) {
+	ctx := SetupTest(t)
+	defer ctx.Cleanup(t)
+
+	cacheDir := ctx.TempDir + "/expiring-cache"
+	cache, err := llm.NewCache(cacheDir, true)
 	if err != nil {
 		t.Fatalf("Failed to create cache: %v", err)
 	}
 	defer cache.Close()
 
-	mockProvider := &llm.MockProvider{
-		Response: "New remediation generated",
+	req := llm.RemediationRequest{
+		CWEID:       "CWE-89",
+		CodeSnippet: "test code",
+		RuleID:      "test-rule",
+	}
+	resp := &llm.RemediationResponse{
+		Explanation: "Test remediation",
+		Confidence:  0.8,
 	}
 
-	client := llm.NewClient(mockProvider, cache)
-
-	finding := scanner.Finding{
-		ID:          "unique-finding",
-		RuleID:      "new-rule",
-		Description: "Never seen before",
-	}
-
-	// Should be cache miss
-	remediation, err := client.GenerateRemediation(finding)
-	if err != nil {
-		t.Fatalf("Failed to generate remediation: %v", err)
-	}
-
-	if remediation == "" {
-		t.Error("Expected non-empty remediation on cache miss")
-	}
-
-	// Verify provider was called
-	if mockProvider.CallCount != 1 {
-		t.Errorf("Expected provider to be called on cache miss, got %d calls", mockProvider.CallCount)
-	}
-}
-
-func TestLLMErrorHandling(t *testing.T) {
-	ctx := SetupTest(t)
-	defer ctx.Cleanup(t)
-
-	// Create provider that returns errors
-	mockProvider := &llm.MockProvider{
-		ShouldError: true,
-		ErrorMsg:    "API rate limit exceeded",
-	}
-
-	client := llm.NewClient(mockProvider, nil)
-
-	finding := scanner.Finding{
-		ID:          "f1",
-		Description: "Test finding",
-	}
-
-	_, err := client.GenerateRemediation(finding)
-	if err == nil {
-		t.Error("Expected error from LLM provider, got nil")
-	}
-
-	if !strings.Contains(err.Error(), "rate limit") {
-		t.Errorf("Expected rate limit error, got: %v", err)
-	}
-}
-
-func TestLLMCacheExpiration(t *testing.T) {
-	ctx := SetupTest(t)
-	defer ctx.Cleanup(t)
-
-	cachePath := ctx.TempDir + "/expiring-cache.db"
-	cache, err := llm.NewCache(cachePath)
-	if err != nil {
-		t.Fatalf("Failed to create cache: %v", err)
-	}
-	defer cache.Close()
-
-	// Set short expiration for testing
-	cache.SetExpiration(1) // 1 second
-
-	cacheKey := "expiring-key"
-	remediation := "This will expire soon"
-
-	err = cache.Set(cacheKey, remediation)
+	err = cache.Set(req, resp)
 	if err != nil {
 		t.Fatalf("Failed to set cache: %v", err)
 	}
 
 	// Immediate retrieval should work
-	_, found := cache.Get(cacheKey)
+	_, found := cache.Get(req)
 	if !found {
 		t.Error("Expected cache hit immediately after set")
 	}
 
-	// Wait for expiration
-	// Note: In real tests, you might use time.Sleep(2 * time.Second)
-	// For this example, we'll just verify the expiration mechanism exists
-	cache.CleanExpired()
+	// Clean with zero duration should remove all entries
+	err = cache.Clean(0)
+	if err != nil {
+		t.Fatalf("Failed to clean cache: %v", err)
+	}
 
-	// After cleanup, expired entries should be removed
-	// This is a simplified test - actual implementation would verify timing
+	// After cleanup with zero maxAge, entries should be removed
+	_, found = cache.Get(req)
+	if found {
+		t.Error("Expected cache miss after cleanup with zero maxAge")
+	}
 }

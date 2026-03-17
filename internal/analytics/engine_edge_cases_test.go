@@ -1,7 +1,6 @@
 package analytics
 
 import (
-	"database/sql"
 	"fmt"
 	"testing"
 	"time"
@@ -107,12 +106,12 @@ func TestGetMTTR_LargeDataSet(t *testing.T) {
 	defer db.Close()
 
 	baseTime := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
-	
+
 	// Insert 1000 findings with varying resolution times
 	for i := 0; i < 1000; i++ {
 		fingerprint := fmt.Sprintf("fp-%d", i)
 		severity := []string{"critical", "high", "medium", "low"}[i%4]
-		
+
 		// First appearance
 		_, err := db.Exec(`
 			INSERT INTO findings_normalized (norm_id, run_id, code_fingerprint, severity, cwe_id, created_at)
@@ -121,7 +120,7 @@ func TestGetMTTR_LargeDataSet(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to insert finding: %v", err)
 		}
-		
+
 		// Last appearance (resolved after i days)
 		if i < 900 { // 900 resolved, 100 still active
 			lastSeen := baseTime.Add(time.Duration(i%30) * 24 * time.Hour)
@@ -171,10 +170,10 @@ func TestGetMTTR_AllSameDuration(t *testing.T) {
 
 	baseTime := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 	resolveTime := baseTime.Add(48 * time.Hour) // All resolve in exactly 2 days
-	
+
 	for i := 0; i < 10; i++ {
 		fingerprint := fmt.Sprintf("fp-%d", i)
-		
+
 		// First appearance
 		_, err := db.Exec(`
 			INSERT INTO findings_normalized (norm_id, run_id, code_fingerprint, severity, cwe_id, created_at)
@@ -183,7 +182,7 @@ func TestGetMTTR_AllSameDuration(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to insert finding: %v", err)
 		}
-		
+
 		// Last appearance
 		_, err = db.Exec(`
 			INSERT INTO findings_normalized (norm_id, run_id, code_fingerprint, severity, cwe_id, created_at)
@@ -555,9 +554,9 @@ func generateFingerprints(count int) []string {
 // TestGetTopCWEs_VariousDistributions tests CWE ranking with different distributions
 func TestGetTopCWEs_VariousDistributions(t *testing.T) {
 	testCases := []struct {
-		name     string
-		cweCounts map[string]int
-		limit    int
+		name        string
+		cweCounts   map[string]int
+		limit       int
 		expectedTop string
 	}{
 		{
@@ -714,7 +713,7 @@ func TestRecordScanMetrics_DuplicateScanID(t *testing.T) {
 
 	engine := NewEngine(db)
 	scanID := "duplicate-scan"
-	
+
 	metrics1 := &SeverityMetrics{
 		Critical: 5,
 		High:     10,
@@ -763,7 +762,7 @@ func TestRecordDailyTrend_SameDate(t *testing.T) {
 
 	engine := NewEngine(db)
 	date := time.Date(2024, 6, 15, 0, 0, 0, 0, time.UTC)
-	
+
 	metrics1 := &SeverityMetrics{
 		Critical: 5,
 		High:     10,
@@ -803,7 +802,7 @@ func TestGetMTTRWithFilter_InvalidSeverity(t *testing.T) {
 	defer db.Close()
 
 	engine := NewEngine(db)
-	
+
 	// Insert some test data
 	baseTime := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 	_, err := db.Exec(`

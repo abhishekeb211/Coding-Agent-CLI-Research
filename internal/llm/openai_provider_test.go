@@ -2,11 +2,8 @@ package llm
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"testing"
 	"time"
 )
@@ -165,13 +162,7 @@ func TestOpenAIProvider_GenerateRemediation(t *testing.T) {
 				LineNumber:     10,
 				Severity:       "medium",
 			},
-			mockResponse: `{
-				"choices": [{
-					"message": {
-						"content": "This is a Cross-Site Scripting vulnerability.\n\nRemediation Steps:\n- Escape user input\n- Use Content Security Policy\n\nExample Fix:\n```python\nfrom html import escape\nhtml = \"<div>\" + escape(user_input) + \"</div>\"\n```"
-					}
-				}]
-			}`,
+			mockResponse:   "{\"choices\": [{\"message\": {\"content\": \"This is a Cross-Site Scripting vulnerability.\\n\\nRemediation Steps:\\n- Escape user input\\n- Use Content Security Policy\\n\\nExample Fix:\\n```python\\nfrom html import escape\\nhtml = \\\"<div>\\\" + escape(user_input) + \\\"</div>\\\"\\n```\"}}]}",
 			mockStatusCode: http.StatusOK,
 			wantErr:        false,
 			checkResponse: func(t *testing.T, resp *RemediationResponse) {
@@ -546,8 +537,8 @@ func TestOpenAIProvider_IsAvailable(t *testing.T) {
 
 func TestOpenAIProvider_parseTextResponse(t *testing.T) {
 	tests := []struct {
-		name     string
-		content  string
+		name      string
+		content   string
 		wantSteps int
 		checkResp func(*testing.T, *RemediationResponse)
 	}{
@@ -583,8 +574,8 @@ Steps:
 			wantSteps: 3,
 		},
 		{
-			name: "no explicit steps",
-			content: `Just some explanation without clear steps.`,
+			name:      "no explicit steps",
+			content:   `Just some explanation without clear steps.`,
 			wantSteps: 1, // Should create a generic step
 		},
 	}
@@ -621,20 +612,4 @@ Steps:
 			}
 		})
 	}
-}
-
-// Helper function
-func contains(s, substr string) bool {
-	return len(s) > 0 && len(substr) > 0 && (s == substr || len(s) >= len(substr) && 
-		(s[:len(substr)] == substr || s[len(s)-len(substr):] == substr || 
-		 len(s) > len(substr) && findSubstring(s, substr)))
-}
-
-func findSubstring(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
 }

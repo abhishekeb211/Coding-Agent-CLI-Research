@@ -2,6 +2,7 @@ package analytics
 
 import (
 	"database/sql"
+	"fmt"
 	"testing"
 	"time"
 
@@ -252,8 +253,8 @@ func TestGetTopCWEs(t *testing.T) {
 
 	// Insert findings with different CWEs
 	findings := []struct {
-		normID string
-		cweID  string
+		normID  string
+		cweID   string
 		cweDesc string
 	}{
 		{"f1", "CWE-79", "Cross-site Scripting"},
@@ -894,7 +895,7 @@ func TestGetMTTR(t *testing.T) {
 	// Insert findings with different lifecycles
 	// Finding 1: Appeared on day 1, resolved by day 3 (2 days to remediate)
 	baseTime := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
-	
+
 	findings := []struct {
 		normID      string
 		fingerprint string
@@ -903,15 +904,15 @@ func TestGetMTTR(t *testing.T) {
 	}{
 		// Finding 1: First seen on day 1, last seen on day 1 (resolved after 2 days)
 		{"f1_day1", "fp1", "high", baseTime},
-		
+
 		// Finding 2: First seen on day 1, last seen on day 5 (resolved after 4 days)
 		{"f2_day1", "fp2", "critical", baseTime},
 		{"f2_day5", "fp2", "critical", baseTime.Add(4 * 24 * time.Hour)},
-		
+
 		// Finding 3: First seen on day 2, last seen on day 4 (resolved after 2 days)
 		{"f3_day2", "fp3", "medium", baseTime.Add(1 * 24 * time.Hour)},
 		{"f3_day4", "fp3", "medium", baseTime.Add(3 * 24 * time.Hour)},
-		
+
 		// Finding 4: Still active (appears on day 6, not resolved)
 		{"f4_day6", "fp4", "low", baseTime.Add(5 * 24 * time.Hour)},
 	}
@@ -1010,7 +1011,7 @@ func TestGetMTTRWithFilter_BySeverity(t *testing.T) {
 
 	// Insert findings with different severities
 	baseTime := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
-	
+
 	findings := []struct {
 		normID      string
 		fingerprint string
@@ -1019,11 +1020,11 @@ func TestGetMTTRWithFilter_BySeverity(t *testing.T) {
 	}{
 		// Critical finding: 2 days to resolve
 		{"f1_day1", "fp1", "critical", baseTime},
-		
+
 		// High finding: 3 days to resolve
 		{"f2_day1", "fp2", "high", baseTime},
 		{"f2_day3", "fp2", "high", baseTime.Add(2 * 24 * time.Hour)},
-		
+
 		// Medium finding: 1 day to resolve
 		{"f3_day1", "fp3", "medium", baseTime},
 	}
@@ -1039,7 +1040,7 @@ func TestGetMTTRWithFilter_BySeverity(t *testing.T) {
 	}
 
 	engine := NewEngine(db)
-	
+
 	// Test filtering by critical severity
 	metrics, err := engine.GetMTTRWithFilter(time.Time{}, time.Time{}, "critical")
 	if err != nil {
@@ -1067,7 +1068,7 @@ func TestGetMTTRWithFilter_DateRange(t *testing.T) {
 
 	// Insert findings across different time periods
 	baseTime := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
-	
+
 	findings := []struct {
 		normID      string
 		fingerprint string
@@ -1076,10 +1077,10 @@ func TestGetMTTRWithFilter_DateRange(t *testing.T) {
 	}{
 		// Finding in January
 		{"f1_jan", "fp1", "high", baseTime},
-		
+
 		// Finding in February
 		{"f2_feb", "fp2", "high", baseTime.Add(31 * 24 * time.Hour)},
-		
+
 		// Finding in March
 		{"f3_mar", "fp3", "high", baseTime.Add(60 * 24 * time.Hour)},
 	}
@@ -1095,11 +1096,11 @@ func TestGetMTTRWithFilter_DateRange(t *testing.T) {
 	}
 
 	engine := NewEngine(db)
-	
+
 	// Test filtering by date range (January only)
 	start := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 	end := time.Date(2024, 1, 31, 23, 59, 59, 0, time.UTC)
-	
+
 	metrics, err := engine.GetMTTRWithFilter(start, end, "")
 	if err != nil {
 		t.Fatalf("GetMTTRWithFilter failed: %v", err)
@@ -1163,7 +1164,7 @@ func TestCalculatePercentile_EmptySlice(t *testing.T) {
 
 	durations := []time.Duration{}
 	p50 := engine.calculatePercentile(durations, 50)
-	
+
 	if p50 != 0 {
 		t.Errorf("Expected 0 for empty slice, got %v", p50)
 	}
@@ -1176,7 +1177,7 @@ func TestCalculatePercentile_SingleValue(t *testing.T) {
 	engine := NewEngine(db)
 
 	durations := []time.Duration{5 * time.Hour}
-	
+
 	p50 := engine.calculatePercentile(durations, 50)
 	if p50 != 5*time.Hour {
 		t.Errorf("Expected 5h for single value, got %v", p50)
@@ -1227,7 +1228,7 @@ func TestGetMTTR_BySeverityBreakdown(t *testing.T) {
 
 	// Insert findings with different severities
 	baseTime := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
-	
+
 	findings := []struct {
 		normID      string
 		fingerprint string
@@ -1836,12 +1837,12 @@ func TestGetHotspotTrends_Cache(t *testing.T) {
 // TestHotspotSeverityScoreCalculation tests the severity score calculation
 func TestHotspotSeverityScoreCalculation(t *testing.T) {
 	testCases := []struct {
-		name      string
-		critical  int
-		high      int
-		medium    int
-		low       int
-		expected  float64
+		name     string
+		critical int
+		high     int
+		medium   int
+		low      int
+		expected float64
 	}{
 		{"All critical", 5, 0, 0, 0, 50.0},
 		{"All high", 0, 5, 0, 0, 25.0},

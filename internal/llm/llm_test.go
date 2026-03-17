@@ -203,7 +203,7 @@ func TestGenerateRemediationTimeout(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	
+
 	// The mock provider is fast, so this might not always timeout
 	// But we're testing that the timeout mechanism works
 	_, err = manager.GenerateRemediation(ctx, req)
@@ -464,8 +464,8 @@ func TestCostLimit(t *testing.T) {
 	}
 }
 
-// TestRetryLogic tests retry with exponential backoff
-func TestRetryLogic(t *testing.T) {
+// TestRetryLogicWithSuccessfulProvider tests retry with exponential backoff when provider succeeds
+func TestRetryLogicWithSuccessfulProvider(t *testing.T) {
 	config := Config{
 		Provider:        "mock",
 		CacheDir:        t.TempDir(),
@@ -500,8 +500,8 @@ func TestRetryLogic(t *testing.T) {
 	}
 }
 
-// TestFallbackChain tests provider fallback
-func TestFallbackChain(t *testing.T) {
+// TestFallbackChainWithMockProviders tests provider fallback using mock providers
+func TestFallbackChainWithMockProviders(t *testing.T) {
 	config := Config{
 		Provider:          "mock",
 		FallbackProviders: []string{"mock", "mock"},

@@ -18,7 +18,7 @@ import (
 
 func main() {
 	fmt.Println("Ollama Provider Example")
-	fmt.Println("=======================\n")
+	fmt.Println("=======================")
 
 	// Configure Ollama provider
 	config := llm.Config{
@@ -43,7 +43,7 @@ func main() {
 	if !manager.IsAvailable() {
 		log.Fatal("Ollama is not running. Please start Ollama with: ollama serve")
 	}
-	fmt.Println("✓ Ollama is running and available\n")
+	fmt.Println("✓ Ollama is running and available")
 
 	// Example 1: SQL Injection vulnerability
 	fmt.Println("Example 1: SQL Injection")
