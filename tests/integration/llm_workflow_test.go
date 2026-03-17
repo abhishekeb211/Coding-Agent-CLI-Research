@@ -7,6 +7,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/coding-agent/cli/internal/llm"
 )
@@ -22,9 +23,9 @@ func TestLLMRemediationGeneration(t *testing.T) {
 		CacheDir:        ctx.TempDir + "/llm-cache",
 		MaxTokens:       1024,
 		Temperature:     0.7,
-		Timeout:         30 * 1e9, // 30 seconds
+		Timeout:         30 * time.Second,
 		MaxRetries:      1,
-		RetryDelay:      100 * 1e6, // 100ms
+		RetryDelay:      100 * time.Millisecond,
 		RetryMultiplier: 2.0,
 	}
 
@@ -182,9 +183,9 @@ func TestLLMWithDifferentCWETypes(t *testing.T) {
 		CacheDir:        ctx.TempDir + "/llm-cache",
 		MaxTokens:       1024,
 		Temperature:     0.7,
-		Timeout:         30 * 1e9,
+		Timeout:         30 * time.Second,
 		MaxRetries:      1,
-		RetryDelay:      100 * 1e6,
+		RetryDelay:      100 * time.Millisecond,
 		RetryMultiplier: 2.0,
 	}
 
@@ -252,9 +253,9 @@ func TestLLMManagerAvailability(t *testing.T) {
 		CacheEnabled:    false,
 		CacheDir:        ctx.TempDir + "/llm-cache",
 		MaxTokens:       1024,
-		Timeout:         30 * 1e9,
+		Timeout:         30 * time.Second,
 		MaxRetries:      1,
-		RetryDelay:      100 * 1e6,
+		RetryDelay:      100 * time.Millisecond,
 		RetryMultiplier: 2.0,
 	}
 
@@ -279,9 +280,9 @@ func TestLLMCostEstimation(t *testing.T) {
 		CacheEnabled:    false,
 		CacheDir:        ctx.TempDir + "/llm-cache",
 		MaxTokens:       1024,
-		Timeout:         30 * 1e9,
+		Timeout:         30 * time.Second,
 		MaxRetries:      1,
-		RetryDelay:      100 * 1e6,
+		RetryDelay:      100 * time.Millisecond,
 		RetryMultiplier: 2.0,
 	}
 
