@@ -270,7 +270,7 @@ func TestOpenAIProviderCostLimit(t *testing.T) {
 
 	ctx := context.Background()
 	_, err = manager.GenerateRemediation(ctx, req)
-	
+
 	// Should fail due to cost limit
 	if err == nil {
 		t.Error("GenerateRemediation() should fail due to cost limit")
@@ -280,7 +280,7 @@ func TestOpenAIProviderCostLimit(t *testing.T) {
 // TestOpenAIProviderRateLimiting tests rate limiting
 func TestOpenAIProviderRateLimiting(t *testing.T) {
 	requestTimes := []time.Time{}
-	
+
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requestTimes = append(requestTimes, time.Now())
 		response := map[string]interface{}{
@@ -342,7 +342,7 @@ func TestOpenAIProviderRateLimiting(t *testing.T) {
 // TestOpenAIProviderWithCache tests caching with OpenAI provider
 func TestOpenAIProviderWithCache(t *testing.T) {
 	callCount := 0
-	
+
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		callCount++
 		response := map[string]interface{}{
@@ -412,9 +412,9 @@ func TestOpenAIProviderWithCache(t *testing.T) {
 // TestOpenAIProviderErrorHandling tests various error scenarios
 func TestOpenAIProviderErrorHandling(t *testing.T) {
 	tests := []struct {
-		name           string
-		statusCode     int
-		responseBody   string
+		name            string
+		statusCode      int
+		responseBody    string
 		wantErrContains string
 	}{
 		{
@@ -486,7 +486,7 @@ func TestOpenAIProviderErrorHandling(t *testing.T) {
 
 			ctx := context.Background()
 			_, err = manager.GenerateRemediation(ctx, req)
-			
+
 			if err == nil {
 				t.Error("GenerateRemediation() should return error")
 				return
@@ -497,18 +497,4 @@ func TestOpenAIProviderErrorHandling(t *testing.T) {
 			}
 		})
 	}
-}
-
-// Helper function to check if string contains substring
-func contains(s, substr string) bool {
-	return len(s) > 0 && len(substr) > 0 && findSubstring(s, substr)
-}
-
-func findSubstring(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
 }

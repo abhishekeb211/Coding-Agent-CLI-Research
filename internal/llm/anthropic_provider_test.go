@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 	"time"
 )
@@ -444,9 +443,9 @@ func TestAnthropicProvider_ParseTextResponse(t *testing.T) {
 	defer provider.Close()
 
 	tests := []struct {
-		name          string
-		content       string
-		wantSteps     int
+		name            string
+		content         string
+		wantSteps       int
 		wantExplanation bool
 	}{
 		{
@@ -625,9 +624,4 @@ func TestAnthropicProvider_JSONResponse(t *testing.T) {
 	if response.Confidence != 0.95 {
 		t.Errorf("Expected confidence 0.95, got %v", response.Confidence)
 	}
-}
-
-// Helper function to check if a string contains a substring
-func contains(s, substr string) bool {
-	return strings.Contains(s, substr)
 }

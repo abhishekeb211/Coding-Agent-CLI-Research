@@ -35,6 +35,35 @@ func (m *mockFailingProvider) Close() error {
 	return nil
 }
 
+// mockCountingProvider is a mock provider that counts attempts and always fails
+type mockCountingProvider struct {
+	name      string
+	err       error
+	available bool
+	attempts  int
+}
+
+func (m *mockCountingProvider) GenerateRemediation(ctx context.Context, req RemediationRequest) (*RemediationResponse, error) {
+	m.attempts++
+	return nil, m.err
+}
+
+func (m *mockCountingProvider) EstimateCost(req RemediationRequest) (float64, error) {
+	return 0.01, nil
+}
+
+func (m *mockCountingProvider) Name() string {
+	return m.name
+}
+
+func (m *mockCountingProvider) IsAvailable() bool {
+	return m.available
+}
+
+func (m *mockCountingProvider) Close() error {
+	return nil
+}
+
 // mockSuccessProvider is a mock provider that always succeeds
 type mockSuccessProvider struct {
 	name      string
@@ -122,7 +151,7 @@ func TestFallbackChain(t *testing.T) {
 			config := DefaultConfig()
 			config.CacheEnabled = false // Disable cache for testing
 			config.MaxRetries = 0       // No retries for faster tests
-			
+
 			manager := &Manager{
 				providers: tt.providers,
 				config:    config,
@@ -153,52 +182,40 @@ func TestFallbackChain(t *testing.T) {
 
 func TestRetryLogic(t *testing.T) {
 	tests := []struct {
-		name        string
-		err         error
-		maxRetries  int
+		name         string
+		err          error
+		maxRetries   int
 		wantAttempts int
 	}{
 		{
-			name:        "retryable error with retries",
-			err:         NewProviderError("test", ErrRateLimitExceeded, "rate limit", true),
-			maxRetries:  2,
+			name:         "retryable error with retries",
+			err:          NewProviderError("test", ErrRateLimitExceeded, "rate limit", true),
+			maxRetries:   2,
 			wantAttempts: 3, // initial + 2 retries
 		},
 		{
-			name:        "non-retryable error",
-			err:         NewProviderError("test", ErrInvalidAPIKey, "invalid key", false),
-			maxRetries:  2,
+			name:         "non-retryable error",
+			err:          NewProviderError("test", ErrInvalidAPIKey, "invalid key", false),
+			maxRetries:   2,
 			wantAttempts: 1, // should fail immediately
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			attempts := 0
-			provider := &mockFailingProvider{
+			provider := &mockCountingProvider{
 				name:      "test",
 				available: true,
 				err:       tt.err,
-			}
-			
-			// Wrap provider to count attempts
-			countingProvider := &struct {
-				*mockFailingProvider
-			}{provider}
-			
-			originalGenerate := provider.GenerateRemediation
-			countingProvider.GenerateRemediation = func(ctx context.Context, req RemediationRequest) (*RemediationResponse, error) {
-				attempts++
-				return originalGenerate(ctx, req)
 			}
 
 			config := DefaultConfig()
 			config.CacheEnabled = false
 			config.MaxRetries = tt.maxRetries
 			config.RetryDelay = 1 * time.Millisecond // Fast retries for testing
-			
+
 			manager := &Manager{
-				providers: []LLMProvider{countingProvider},
+				providers: []LLMProvider{provider},
 				config:    config,
 			}
 
@@ -208,13 +225,13 @@ func TestRetryLogic(t *testing.T) {
 			}
 
 			_, err := manager.GenerateRemediation(context.Background(), req)
-			
+
 			if err == nil {
 				t.Error("Expected error, got success")
 			}
-			
-			if attempts != tt.wantAttempts {
-				t.Errorf("Expected %d attempts, got %d", tt.wantAttempts, attempts)
+
+			if provider.attempts != tt.wantAttempts {
+				t.Errorf("Expected %d attempts, got %d", tt.wantAttempts, provider.attempts)
 			}
 		})
 	}
@@ -271,7 +288,7 @@ func TestErrorMessages(t *testing.T) {
 			config := DefaultConfig()
 			config.CacheEnabled = false
 			config.MaxRetries = 0
-			
+
 			manager := &Manager{
 				providers: tt.providers,
 				config:    config,
@@ -283,7 +300,7 @@ func TestErrorMessages(t *testing.T) {
 			}
 
 			_, err := manager.GenerateRemediation(context.Background(), req)
-			
+
 			if err == nil {
 				t.Fatal("Expected error, got success")
 			}
@@ -302,12 +319,12 @@ func TestCostLimitEnforcement(t *testing.T) {
 	config := DefaultConfig()
 	config.CacheEnabled = false
 	config.CostLimit = 0.005 // Very low limit
-	
+
 	provider := &mockSuccessProvider{
 		name:      "expensive-provider",
 		available: true,
 	}
-	
+
 	manager := &Manager{
 		providers: []LLMProvider{provider},
 		config:    config,
@@ -319,11 +336,11 @@ func TestCostLimitEnforcement(t *testing.T) {
 	}
 
 	_, err := manager.GenerateRemediation(context.Background(), req)
-	
+
 	if err == nil {
 		t.Error("Expected cost limit error, got success")
 	}
-	
+
 	if !strings.Contains(err.Error(), "exceeds limit") {
 		t.Errorf("Expected cost limit error, got: %v", err)
 	}
