@@ -68,7 +68,7 @@ func TestLLMCachingBehavior(t *testing.T) {
 	req := llm.RemediationRequest{
 		CWEID:          "CWE-89",
 		CWEDescription: "SQL Injection",
-		CodeSnippet:    "SELECT * FROM users WHERE id = " + "'test'",
+		CodeSnippet:    `SELECT * FROM users WHERE id = 'test'`,
 		FilePath:       "app.py",
 		LineNumber:     42,
 		Severity:       "critical",
@@ -313,31 +313,37 @@ func TestLLMErrorHandling(t *testing.T) {
 	ctx := SetupTest(t)
 	defer ctx.Cleanup(t)
 
-	// Test with unavailable provider (non-mock, no API key)
+	// Test that manager creation validates provider configuration
 	config := llm.DefaultConfig()
 	config.Provider = "openai"
 	config.APIKey = ""
 	config.FallbackProviders = []string{} // No fallbacks
 	config.CacheEnabled = false
 
-	// NewManager with openai but no API key should still succeed (provider creation is lazy)
-	// but GenerateRemediation should fail
 	manager, err := llm.NewManager(config)
 	if err != nil {
-		// If manager creation fails due to missing API key, that's also valid behavior
-		t.Logf("Manager creation failed as expected: %v", err)
+		// Manager creation failed due to missing API key — this is expected error handling
+		t.Logf("Manager correctly rejected invalid config: %v", err)
 		return
 	}
 	defer manager.Close()
 
+	// If manager was created, GenerateRemediation should fail without valid API key
 	req := llm.RemediationRequest{
 		CWEID:       "CWE-89",
 		CodeSnippet: "test code",
 	}
 
 	_, err = manager.GenerateRemediation(context.Background(), req)
-	if err == nil {
-		t.Log("Note: GenerateRemediation succeeded (mock fallback may be active)")
+	if err != nil {
+		// Expected: provider should fail without API key
+		t.Logf("GenerateRemediation correctly failed: %v", err)
+	} else {
+		// If it succeeds, mock fallback is active — verify we got a valid response
+		t.Log("GenerateRemediation succeeded via fallback provider — verifying mock fallback is active")
+		if !manager.IsAvailable() {
+			t.Error("Manager should report as available if generation succeeded")
+		}
 	}
 }
 
